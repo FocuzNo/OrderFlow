@@ -1,2 +1,31 @@
-using Microsoft.EntityFrameworkCore;using Microsoft.Extensions.Configuration;using Microsoft.Extensions.DependencyInjection;using OrderFlow.Ordering.Application.Abstractions.Persistence;using OrderFlow.Ordering.Infrastructure.Messaging;using OrderFlow.Ordering.Infrastructure.Persistence;namespace OrderFlow.Ordering.Infrastructure;public static class DependencyInjection{public static IServiceCollection AddInfrastructure(this IServiceCollection s,IConfiguration c){var cs=c.GetConnectionString("OrderingDatabase")??throw new InvalidOperationException("ConnectionStrings:OrderingDatabase is required.");_=c[$"{KafkaOptions.SectionName}:BootstrapServers"]??throw new InvalidOperationException("Kafka:BootstrapServers is required.");s.Configure<KafkaOptions>(c.GetSection(KafkaOptions.SectionName));s.AddDbContext<OrderingDbContext>(x=>x.UseNpgsql(cs).UseSnakeCaseNamingConvention());s.AddScoped<IOrderRepository,OrderRepository>();s.AddSingleton<IKafkaPublisher,KafkaPublisher>();s.AddHostedService<OutboxProcessor>();s.AddHostedService<WorkflowConsumer>();s.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka",tags:["ready"]);return s;}}
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using OrderFlow.Ordering.Application.Abstractions.Persistence;
+using OrderFlow.Ordering.Infrastructure.Messaging;
+using OrderFlow.Ordering.Infrastructure.Persistence;
 
+namespace OrderFlow.Ordering.Infrastructure;
+
+public static class DependencyInjection
+{
+    public static IServiceCollection AddInfrastructure(this IServiceCollection s, IConfiguration c)
+    {
+        var cs =
+            c.GetConnectionString("OrderingDatabase")
+            ?? throw new InvalidOperationException(
+                "ConnectionStrings:OrderingDatabase is required."
+            );
+        _ =
+            c[$"{KafkaOptions.SectionName}:BootstrapServers"]
+            ?? throw new InvalidOperationException("Kafka:BootstrapServers is required.");
+        s.Configure<KafkaOptions>(c.GetSection(KafkaOptions.SectionName));
+        s.AddDbContext<OrderingDbContext>(x => x.UseNpgsql(cs).UseSnakeCaseNamingConvention());
+        s.AddScoped<IOrderRepository, OrderRepository>();
+        s.AddSingleton<IKafkaPublisher, KafkaPublisher>();
+        s.AddHostedService<OutboxProcessor>();
+        s.AddHostedService<WorkflowConsumer>();
+        s.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
+        return s;
+    }
+}

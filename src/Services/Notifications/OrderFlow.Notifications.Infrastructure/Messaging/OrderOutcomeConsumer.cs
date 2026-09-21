@@ -1,9 +1,143 @@
-using System.Text.Json; using Confluent.Kafka; using MediatR; using Microsoft.EntityFrameworkCore; using Microsoft.Extensions.DependencyInjection; using Microsoft.Extensions.Hosting; using Microsoft.Extensions.Logging; using Microsoft.Extensions.Options; using OrderFlow.IntegrationContracts; using OrderFlow.Notifications.Application.Notifications; using OrderFlow.Notifications.Infrastructure.Persistence;
+using System.Text.Json;
+using Confluent.Kafka;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using OrderFlow.IntegrationContracts;
+using OrderFlow.Notifications.Application.Notifications;
+using OrderFlow.Notifications.Infrastructure.Persistence;
+
 namespace OrderFlow.Notifications.Infrastructure.Messaging;
-public sealed class OrderOutcomeConsumer(IServiceScopeFactory scopes,IOptions<KafkaOptions> options,IKafkaPublisher publisher,ILogger<OrderOutcomeConsumer> logger):BackgroundService
+
+public sealed class OrderOutcomeConsumer(
+    IServiceScopeFactory scopes,
+    IOptions<KafkaOptions> options,
+    IKafkaPublisher publisher,
+    ILogger<OrderOutcomeConsumer> logger
+) : BackgroundService
 {
- protected override Task ExecuteAsync(CancellationToken ct)=>Task.Run(()=>Consume(ct),ct);
- private async Task Consume(CancellationToken ct){using var c=new ConsumerBuilder<string,string>(new ConsumerConfig{BootstrapServers=options.Value.BootstrapServers,GroupId=options.Value.ConsumerGroup,EnableAutoCommit=false,AutoOffsetReset=AutoOffsetReset.Earliest}).Build();c.Subscribe(KafkaTopics.OrderEvents);try{while(!ct.IsCancellationRequested){var r=c.Consume(ct);await Retry(r,ct);c.Commit(r);}}catch(OperationCanceledException)when(ct.IsCancellationRequested){}finally{c.Close();}}
- private async Task Retry(ConsumeResult<string,string> r,CancellationToken ct){var max=Math.Max(1,options.Value.MaxRetries);for(var attempt=1;attempt<=max;attempt++){try{await Handle(r.Message.Value,ct);return;}catch(Exception ex)when(attempt<max){logger.LogWarning(ex,"Notification consumer retry {Attempt}/{MaxAttempts}",attempt,max);await Task.Delay(TimeSpan.FromSeconds(Math.Min(attempt*2,10)),ct);}catch(Exception ex){logger.LogError(ex,"Notification event exhausted retries and moved to DLT");await publisher.PublishAsync(KafkaTopics.DeadLetters,r.Message.Key,r.Message.Value,ct);}}}
- private async Task Handle(string content,CancellationToken ct){var env=JsonSerializer.Deserialize<IntegrationEventEnvelope>(content)??throw new JsonException("Envelope is invalid.");if(env.EventType!=nameof(OrderConfirmedIntegrationEvent)&&env.EventType!=nameof(OrderCancelledIntegrationEvent))return;await using var scope=scopes.CreateAsyncScope();var db=scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();if(await db.InboxMessages.AnyAsync(x=>x.Id==env.EventId&&x.Consumer==options.Value.ConsumerGroup,ct))return;await using var tx=await db.Database.BeginTransactionAsync(ct);var sender=scope.ServiceProvider.GetRequiredService<ISender>();string recipient;string subject;string body;if(env.EventType==nameof(OrderConfirmedIntegrationEvent)){var e=JsonSerializer.Deserialize<OrderConfirmedIntegrationEvent>(env.Payload)??throw new JsonException("Order event is invalid.");recipient=e.CustomerEmail;subject="Order confirmed";body=$"Order {e.OrderId} has been confirmed.";}else{var e=JsonSerializer.Deserialize<OrderCancelledIntegrationEvent>(env.Payload)??throw new JsonException("Order event is invalid.");recipient=e.CustomerEmail;subject="Order cancelled";body=$"Order {e.OrderId} was cancelled: {e.Reason}";}var n=await sender.Send(new NotificationFeatures.Create(recipient,subject,body,"Email"),ct);await sender.Send(new NotificationFeatures.Send(n.Id),ct);db.InboxMessages.Add(new(){Id=env.EventId,Consumer=options.Value.ConsumerGroup,ProcessedOnUtc=DateTimeOffset.UtcNow});await db.SaveChangesAsync(ct);await tx.CommitAsync(ct);}
+    protected override Task ExecuteAsync(CancellationToken ct) => Task.Run(() => Consume(ct), ct);
+
+    private async Task Consume(CancellationToken ct)
+    {
+        using var c = new ConsumerBuilder<string, string>(
+            new ConsumerConfig
+            {
+                BootstrapServers = options.Value.BootstrapServers,
+                GroupId = options.Value.ConsumerGroup,
+                EnableAutoCommit = false,
+                AutoOffsetReset = AutoOffsetReset.Earliest,
+            }
+        ).Build();
+        c.Subscribe(KafkaTopics.OrderEvents);
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var r = c.Consume(ct);
+                await Retry(r, ct);
+                c.Commit(r);
+            }
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        finally
+        {
+            c.Close();
+        }
+    }
+
+    private async Task Retry(ConsumeResult<string, string> r, CancellationToken ct)
+    {
+        var max = Math.Max(1, options.Value.MaxRetries);
+        for (var attempt = 1; attempt <= max; attempt++)
+        {
+            try
+            {
+                await Handle(r.Message.Value, ct);
+                return;
+            }
+            catch (Exception ex) when (attempt < max)
+            {
+                logger.LogWarning(
+                    ex,
+                    "Notification consumer retry {Attempt}/{MaxAttempts}",
+                    attempt,
+                    max
+                );
+                await Task.Delay(TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)), ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Notification event exhausted retries and moved to DLT");
+                await publisher.PublishAsync(
+                    KafkaTopics.DeadLetters,
+                    r.Message.Key,
+                    r.Message.Value,
+                    ct
+                );
+            }
+        }
+    }
+
+    private async Task Handle(string content, CancellationToken ct)
+    {
+        var env =
+            JsonSerializer.Deserialize<IntegrationEventEnvelope>(content)
+            ?? throw new JsonException("Envelope is invalid.");
+        if (
+            env.EventType != nameof(OrderConfirmedIntegrationEvent)
+            && env.EventType != nameof(OrderCancelledIntegrationEvent)
+        )
+            return;
+        await using var scope = scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
+        if (
+            await db.InboxMessages.AnyAsync(
+                x => x.Id == env.EventId && x.Consumer == options.Value.ConsumerGroup,
+                ct
+            )
+        )
+            return;
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        string recipient;
+        string subject;
+        string body;
+        if (env.EventType == nameof(OrderConfirmedIntegrationEvent))
+        {
+            var e =
+                JsonSerializer.Deserialize<OrderConfirmedIntegrationEvent>(env.Payload)
+                ?? throw new JsonException("Order event is invalid.");
+            recipient = e.CustomerEmail;
+            subject = "Order confirmed";
+            body = $"Order {e.OrderId} has been confirmed.";
+        }
+        else
+        {
+            var e =
+                JsonSerializer.Deserialize<OrderCancelledIntegrationEvent>(env.Payload)
+                ?? throw new JsonException("Order event is invalid.");
+            recipient = e.CustomerEmail;
+            subject = "Order cancelled";
+            body = $"Order {e.OrderId} was cancelled: {e.Reason}";
+        }
+        var n = await sender.Send(
+            new NotificationFeatures.Create(recipient, subject, body, "Email"),
+            ct
+        );
+        await sender.Send(new NotificationFeatures.Send(n.Id), ct);
+        db.InboxMessages.Add(
+            new()
+            {
+                Id = env.EventId,
+                Consumer = options.Value.ConsumerGroup,
+                ProcessedOnUtc = DateTimeOffset.UtcNow,
+            }
+        );
+        await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+    }
 }

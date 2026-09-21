@@ -8,4 +8,5 @@ public sealed record IntegrationEventEnvelope(
     string CorrelationId,
     string? CausationId,
     string AggregateId,
-    string Payload);
+    string Payload
+);

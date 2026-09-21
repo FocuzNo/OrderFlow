@@ -1,1 +1,7 @@
-namespace OrderFlow.Payments.Infrastructure.Payments;public sealed class DevelopmentPaymentGatewayOptions{public const string SectionName="DevelopmentPaymentGateway";public bool Succeed{get;init;}=true;}
+namespace OrderFlow.Payments.Infrastructure.Payments;
+
+public sealed class DevelopmentPaymentGatewayOptions
+{
+    public const string SectionName = "DevelopmentPaymentGateway";
+    public bool Succeed { get; init; } = true;
+}

@@ -1,5 +1,7 @@
 using OrderFlow.Catalog.Domain.Categories;
+
 namespace OrderFlow.Catalog.Application.Abstractions.Persistence;
+
 public interface ICategoryRepository
 {
     Task<Category?> GetByIdAsync(Guid id, CancellationToken cancellationToken);

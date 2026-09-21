@@ -5,7 +5,12 @@ namespace OrderFlow.Ordering.UnitTests;
 
 public sealed class OrderTests
 {
-    private static Order CreateOrder() => Order.Create(Guid.NewGuid(), "buyer@example.test", ShippingAddress.Create("1 Main St", "Minsk", "220000", "BY"));
+    private static Order CreateOrder() =>
+        Order.Create(
+            Guid.NewGuid(),
+            "buyer@example.test",
+            ShippingAddress.Create("1 Main St", "Minsk", "220000", "BY")
+        );
 
     [Fact]
     public void Submit_moves_order_to_inventory_and_raises_event()

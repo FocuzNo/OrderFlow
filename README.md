@@ -4,13 +4,13 @@ OrderFlow is an educational .NET 10 event-driven commerce backend. It contains f
 
 ## Services and HTTP API
 
-| Service | Port | Main endpoints |
-|---|---:|---|
-| Catalog | 5001 | categories CRUD; products create/get/list/update, price, activate, deactivate, archive |
-| Inventory | 5002 | warehouses; stock create/get/increase/decrease; reservations create/get/confirm/release |
-| Ordering | 5003 | orders create/get/by customer; items add/remove; submit/cancel |
-| Payments | 5004 | create/process/get/by order; succeed/fail/refund |
-| Notifications | 5005 | create/get/by recipient; send/retry |
+| Service       | Port | Main endpoints                                                                          |
+| ------------- | ---: | --------------------------------------------------------------------------------------- |
+| Catalog       | 5001 | categories CRUD; products create/get/list/update, price, activate, deactivate, archive  |
+| Inventory     | 5002 | warehouses; stock create/get/increase/decrease; reservations create/get/confirm/release |
+| Ordering      | 5003 | orders create/get/by customer; items add/remove; submit/cancel                          |
+| Payments      | 5004 | create/process/get/by order; succeed/fail/refund                                        |
+| Notifications | 5005 | create/get/by recipient; send/retry                                                     |
 
 Every API exposes `/openapi/v1.json`, `/health/live`, and `/health/ready`. Validation and domain failures use centralized RFC 7807 Problem Details. `X-Correlation-ID` is accepted or generated and returned on each request.
 

@@ -1,2 +1,11 @@
 namespace OrderFlow.Catalog.Infrastructure.Messaging;
-public interface IKafkaPublisher { Task PublishAsync(string topic,string key,string content,CancellationToken cancellationToken); }
+
+public interface IKafkaPublisher
+{
+    Task PublishAsync(
+        string topic,
+        string key,
+        string content,
+        CancellationToken cancellationToken
+    );
+}

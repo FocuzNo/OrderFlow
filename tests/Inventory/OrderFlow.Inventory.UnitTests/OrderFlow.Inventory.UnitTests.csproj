@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -22,5 +21,4 @@
     <ProjectReference Include="..\..\..\src\Services\Inventory\OrderFlow.Inventory.Domain\OrderFlow.Inventory.Domain.csproj" />
     <ProjectReference Include="..\..\..\src\Services\Inventory\OrderFlow.Inventory.Application\OrderFlow.Inventory.Application.csproj" />
   </ItemGroup>
-
 </Project>

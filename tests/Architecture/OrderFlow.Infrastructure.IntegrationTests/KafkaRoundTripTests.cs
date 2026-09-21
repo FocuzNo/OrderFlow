@@ -13,14 +13,29 @@ public sealed class KafkaRoundTripTests
         var topic = $"orderflow-test-{Guid.NewGuid():N}";
         var key = Guid.NewGuid().ToString("N");
 
-        using (var producer = new ProducerBuilder<string, string>(new ProducerConfig { BootstrapServers = kafka.GetBootstrapAddress(), EnableIdempotence = true }).Build())
-            await producer.ProduceAsync(topic, new Message<string, string> { Key = key, Value = "payload" });
+        using (
+            var producer = new ProducerBuilder<string, string>(
+                new ProducerConfig
+                {
+                    BootstrapServers = kafka.GetBootstrapAddress(),
+                    EnableIdempotence = true,
+                }
+            ).Build()
+        )
+            await producer.ProduceAsync(
+                topic,
+                new Message<string, string> { Key = key, Value = "payload" }
+            );
 
-        using var consumer = new ConsumerBuilder<string, string>(new ConsumerConfig
-        {
-            BootstrapServers = kafka.GetBootstrapAddress(), GroupId = $"test-{Guid.NewGuid():N}",
-            AutoOffsetReset = AutoOffsetReset.Earliest, EnableAutoCommit = false
-        }).Build();
+        using var consumer = new ConsumerBuilder<string, string>(
+            new ConsumerConfig
+            {
+                BootstrapServers = kafka.GetBootstrapAddress(),
+                GroupId = $"test-{Guid.NewGuid():N}",
+                AutoOffsetReset = AutoOffsetReset.Earliest,
+                EnableAutoCommit = false,
+            }
+        ).Build();
         consumer.Subscribe(topic);
         var result = consumer.Consume(TimeSpan.FromSeconds(30));
 

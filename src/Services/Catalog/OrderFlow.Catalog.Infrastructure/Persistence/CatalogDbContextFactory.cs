@@ -8,7 +8,10 @@ public sealed class CatalogDbContextFactory : IDesignTimeDbContextFactory<Catalo
     public CatalogDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<CatalogDbContext>()
-            .UseNpgsql("Host=localhost;Database=orderflow_catalog;Username=postgres;Password=postgres").UseSnakeCaseNamingConvention()
+            .UseNpgsql(
+                "Host=localhost;Database=orderflow_catalog;Username=postgres;Password=postgres"
+            )
+            .UseSnakeCaseNamingConvention()
             .Options;
 
         return new CatalogDbContext(options);

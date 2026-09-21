@@ -14,14 +14,14 @@ Every service has an `InitialDistributedArchitecture` migration. Run migrations 
 
 ## Event topology
 
-| Topic | Publishers | Consumers |
-|---|---|---|
-| `orderflow.catalog.events.v1` | Catalog | future read models/integrations |
-| `orderflow.ordering.events.v1` | Ordering | Inventory, Payments, Notifications |
-| `orderflow.inventory.events.v1` | Inventory | Ordering |
-| `orderflow.payments.events.v1` | Payments | Ordering |
-| `orderflow.notifications.events.v1` | Notifications | future audit/integrations |
-| `orderflow.dead-letter.v1` | all consumers | operations/manual replay |
+| Topic                               | Publishers    | Consumers                          |
+| ----------------------------------- | ------------- | ---------------------------------- |
+| `orderflow.catalog.events.v1`       | Catalog       | future read models/integrations    |
+| `orderflow.ordering.events.v1`      | Ordering      | Inventory, Payments, Notifications |
+| `orderflow.inventory.events.v1`     | Inventory     | Ordering                           |
+| `orderflow.payments.events.v1`      | Payments      | Ordering                           |
+| `orderflow.notifications.events.v1` | Notifications | future audit/integrations          |
+| `orderflow.dead-letter.v1`          | all consumers | operations/manual replay           |
 
 Every envelope carries event id, type, schema version, occurrence time, correlation id, causation id, aggregate id, and JSON payload. Aggregate/order id is used as Kafka key to preserve per-aggregate partition ordering.
 

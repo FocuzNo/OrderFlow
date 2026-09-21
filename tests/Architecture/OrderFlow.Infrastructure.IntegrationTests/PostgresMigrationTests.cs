@@ -5,8 +5,8 @@ using Testcontainers.PostgreSql;
 using CatalogContext = OrderFlow.Catalog.Infrastructure.Persistence.CatalogDbContext;
 using InventoryContext = OrderFlow.Inventory.Infrastructure.Persistence.InventoryDbContext;
 using NotificationsContext = OrderFlow.Notifications.Infrastructure.Persistence.NotificationsDbContext;
-using OrderingAggregate = OrderFlow.Ordering.Domain.Orders.Order;
 using OrderingAddress = OrderFlow.Ordering.Domain.Orders.ShippingAddress;
+using OrderingAggregate = OrderFlow.Ordering.Domain.Orders.Order;
 using OrderingContext = OrderFlow.Ordering.Infrastructure.Persistence.OrderingDbContext;
 using PaymentsContext = OrderFlow.Payments.Infrastructure.Persistence.PaymentsDbContext;
 
@@ -16,7 +16,13 @@ public sealed class DockerFactAttribute : FactAttribute
 {
     public DockerFactAttribute()
     {
-        if (!string.Equals(Environment.GetEnvironmentVariable("RUN_DOCKER_TESTS"), "true", StringComparison.OrdinalIgnoreCase))
+        if (
+            !string.Equals(
+                Environment.GetEnvironmentVariable("RUN_DOCKER_TESTS"),
+                "true",
+                StringComparison.OrdinalIgnoreCase
+            )
+        )
             Skip = "Set RUN_DOCKER_TESTS=true and start Docker to run container integration tests.";
     }
 }
@@ -29,11 +35,26 @@ public sealed class PostgresMigrationTests
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync();
 
-        await Apply<CatalogContext>(postgres.GetConnectionString(), options => new CatalogContext(options));
-        await Apply<InventoryContext>(postgres.GetConnectionString(), options => new InventoryContext(options));
-        await Apply<OrderingContext>(postgres.GetConnectionString(), options => new OrderingContext(options));
-        await Apply<PaymentsContext>(postgres.GetConnectionString(), options => new PaymentsContext(options));
-        await Apply<NotificationsContext>(postgres.GetConnectionString(), options => new NotificationsContext(options));
+        await Apply<CatalogContext>(
+            postgres.GetConnectionString(),
+            options => new CatalogContext(options)
+        );
+        await Apply<InventoryContext>(
+            postgres.GetConnectionString(),
+            options => new InventoryContext(options)
+        );
+        await Apply<OrderingContext>(
+            postgres.GetConnectionString(),
+            options => new OrderingContext(options)
+        );
+        await Apply<PaymentsContext>(
+            postgres.GetConnectionString(),
+            options => new PaymentsContext(options)
+        );
+        await Apply<NotificationsContext>(
+            postgres.GetConnectionString(),
+            options => new NotificationsContext(options)
+        );
     }
 
     [DockerFact]
@@ -41,7 +62,10 @@ public sealed class PostgresMigrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync();
-        var options = new DbContextOptionsBuilder<InventoryContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+        var options = new DbContextOptionsBuilder<InventoryContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .UseSnakeCaseNamingConvention()
+            .Options;
 
         Guid stockId;
         await using (var setup = new InventoryContext(options))
@@ -50,15 +74,20 @@ public sealed class PostgresMigrationTests
             var warehouse = Warehouse.Create("Main", "Minsk");
             var stock = StockItem.Create(Guid.NewGuid(), warehouse.Id, "SKU-1");
             stock.Increase(5);
-            setup.Warehouses.Add(warehouse); setup.StockItems.Add(stock);
+            setup.Warehouses.Add(warehouse);
+            setup.StockItems.Add(stock);
             await setup.SaveChangesAsync();
             stockId = stock.Id;
         }
 
         await using var first = new InventoryContext(options);
         await using var second = new InventoryContext(options);
-        var firstStock = await first.StockItems.Include(x => x.Reservations).SingleAsync(x => x.Id == stockId);
-        var secondStock = await second.StockItems.Include(x => x.Reservations).SingleAsync(x => x.Id == stockId);
+        var firstStock = await first
+            .StockItems.Include(x => x.Reservations)
+            .SingleAsync(x => x.Id == stockId);
+        var secondStock = await second
+            .StockItems.Include(x => x.Reservations)
+            .SingleAsync(x => x.Id == stockId);
         firstStock.Reserve(Guid.NewGuid(), 4);
         secondStock.Reserve(Guid.NewGuid(), 4);
         await first.SaveChangesAsync();
@@ -67,12 +96,26 @@ public sealed class PostgresMigrationTests
         var eventId = Guid.NewGuid();
         await using (var inbox = new InventoryContext(options))
         {
-            inbox.InboxMessages.Add(new() { Id = eventId, Consumer = "test", ProcessedOnUtc = DateTimeOffset.UtcNow });
+            inbox.InboxMessages.Add(
+                new()
+                {
+                    Id = eventId,
+                    Consumer = "test",
+                    ProcessedOnUtc = DateTimeOffset.UtcNow,
+                }
+            );
             await inbox.SaveChangesAsync();
         }
         await using (var duplicate = new InventoryContext(options))
         {
-            duplicate.InboxMessages.Add(new() { Id = eventId, Consumer = "test", ProcessedOnUtc = DateTimeOffset.UtcNow });
+            duplicate.InboxMessages.Add(
+                new()
+                {
+                    Id = eventId,
+                    Consumer = "test",
+                    ProcessedOnUtc = DateTimeOffset.UtcNow,
+                }
+            );
             await Assert.ThrowsAsync<DbUpdateException>(() => duplicate.SaveChangesAsync());
         }
     }
@@ -82,10 +125,17 @@ public sealed class PostgresMigrationTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync();
-        var options = new DbContextOptionsBuilder<OrderingContext>().UseNpgsql(postgres.GetConnectionString()).UseSnakeCaseNamingConvention().Options;
+        var options = new DbContextOptionsBuilder<OrderingContext>()
+            .UseNpgsql(postgres.GetConnectionString())
+            .UseSnakeCaseNamingConvention()
+            .Options;
         await using var db = new OrderingContext(options);
         await db.Database.MigrateAsync();
-        var order = OrderingAggregate.Create(Guid.NewGuid(), "buyer@example.test", OrderingAddress.Create("1 Main St", "Minsk", "220000", "BY"));
+        var order = OrderingAggregate.Create(
+            Guid.NewGuid(),
+            "buyer@example.test",
+            OrderingAddress.Create("1 Main St", "Minsk", "220000", "BY")
+        );
         order.AddItem(Guid.NewGuid(), "Notebook", 12.50m, 2);
         order.Submit();
         db.Orders.Add(order);
@@ -96,10 +146,16 @@ public sealed class PostgresMigrationTests
         Assert.Equal(1, await db.OutboxMessages.CountAsync());
     }
 
-    private static async Task Apply<TContext>(string connectionString, Func<DbContextOptions<TContext>, TContext> factory)
+    private static async Task Apply<TContext>(
+        string connectionString,
+        Func<DbContextOptions<TContext>, TContext> factory
+    )
         where TContext : DbContext
     {
-        var options = new DbContextOptionsBuilder<TContext>().UseNpgsql(connectionString).UseSnakeCaseNamingConvention().Options;
+        var options = new DbContextOptionsBuilder<TContext>()
+            .UseNpgsql(connectionString)
+            .UseSnakeCaseNamingConvention()
+            .Options;
         await using var context = factory(options);
         await context.Database.EnsureDeletedAsync();
         await context.Database.MigrateAsync();

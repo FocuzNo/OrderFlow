@@ -1,5 +1,139 @@
-using FastEndpoints;using MediatR;using F=OrderFlow.Ordering.Application.Orders.OrderFeatures;namespace OrderFlow.Ordering.Api.Endpoints;public static class OrderEndpoints
-{public class IdReq{public Guid Id{get;set;}}public sealed class CreateReq{public Guid CustomerId{get;set;}public string CustomerEmail{get;set;}=string.Empty;public string Line1{get;set;}=string.Empty;public string City{get;set;}=string.Empty;public string PostalCode{get;set;}=string.Empty;public string Country{get;set;}=string.Empty;}public sealed class ItemReq{public Guid Id{get;set;}public Guid ItemId{get;set;}public Guid ProductId{get;set;}public string ProductName{get;set;}=string.Empty;public decimal UnitPrice{get;set;}public int Quantity{get;set;}}public sealed class CancelReq:IdReq{public string Reason{get;set;}=string.Empty;}
-public sealed class Create(ISender s):Endpoint<CreateReq,F.Dto>{public override void Configure(){Post("/api/orders");AllowAnonymous();}public override async Task HandleAsync(CreateReq r,CancellationToken ct)=>await Send.ResponseAsync(await s.Send(new F.Create(r.CustomerId,r.CustomerEmail,new(r.Line1,r.City,r.PostalCode,r.Country)),ct),201,ct);}public sealed class AddItem(ISender s):Endpoint<ItemReq,F.Dto>{public override void Configure(){Post("/api/orders/{id}/items");AllowAnonymous();}public override async Task HandleAsync(ItemReq r,CancellationToken ct)=>await Send.OkAsync(await s.Send(new F.AddItem(r.Id,r.ProductId,r.ProductName,r.UnitPrice,r.Quantity),ct),ct);}public sealed class RemoveItem(ISender s):Endpoint<ItemReq,F.Dto>{public override void Configure(){Delete("/api/orders/{id}/items/{itemId}");AllowAnonymous();}public override async Task HandleAsync(ItemReq r,CancellationToken ct)=>await Send.OkAsync(await s.Send(new F.RemoveItem(r.Id,r.ItemId),ct),ct);}
-public sealed class Submit(ISender s):Endpoint<IdReq,F.Dto>{public override void Configure(){Post("/api/orders/{id}/submit");AllowAnonymous();}public override async Task HandleAsync(IdReq r,CancellationToken ct)=>await Send.OkAsync(await s.Send(new F.Submit(r.Id),ct),ct);}public sealed class Get(ISender s):Endpoint<IdReq,F.Dto>{public override void Configure(){Get("/api/orders/{id}");AllowAnonymous();}public override async Task HandleAsync(IdReq r,CancellationToken ct)=>await Send.OkAsync(await s.Send(new F.GetById(r.Id),ct),ct);}public sealed class CustomerOrders(ISender s):Endpoint<IdReq,IReadOnlyList<F.Dto>>{public override void Configure(){Get("/api/customers/{id}/orders");AllowAnonymous();}public override async Task HandleAsync(IdReq r,CancellationToken ct)=>await Send.OkAsync(await s.Send(new F.GetCustomerOrders(r.Id),ct),ct);}public sealed class Cancel(ISender s):Endpoint<CancelReq,F.Dto>{public override void Configure(){Post("/api/orders/{id}/cancel");AllowAnonymous();}public override async Task HandleAsync(CancelReq r,CancellationToken ct)=>await Send.OkAsync(await s.Send(new F.Cancel(r.Id,r.Reason),ct),ct);}}
+using FastEndpoints;
+using MediatR;
+using F = OrderFlow.Ordering.Application.Orders.OrderFeatures;
 
+namespace OrderFlow.Ordering.Api.Endpoints;
+
+public static class OrderEndpoints
+{
+    public class IdReq
+    {
+        public Guid Id { get; set; }
+    }
+
+    public sealed class CreateReq
+    {
+        public Guid CustomerId { get; set; }
+        public string CustomerEmail { get; set; } = string.Empty;
+        public string Line1 { get; set; } = string.Empty;
+        public string City { get; set; } = string.Empty;
+        public string PostalCode { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;
+    }
+
+    public sealed class ItemReq
+    {
+        public Guid Id { get; set; }
+        public Guid ItemId { get; set; }
+        public Guid ProductId { get; set; }
+        public string ProductName { get; set; } = string.Empty;
+        public decimal UnitPrice { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public sealed class CancelReq : IdReq
+    {
+        public string Reason { get; set; } = string.Empty;
+    }
+
+    public sealed class Create(ISender s) : Endpoint<CreateReq, F.Dto>
+    {
+        public override void Configure()
+        {
+            Post("/api/orders");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(CreateReq r, CancellationToken ct) =>
+            await Send.ResponseAsync(
+                await s.Send(
+                    new F.Create(
+                        r.CustomerId,
+                        r.CustomerEmail,
+                        new(r.Line1, r.City, r.PostalCode, r.Country)
+                    ),
+                    ct
+                ),
+                201,
+                ct
+            );
+    }
+
+    public sealed class AddItem(ISender s) : Endpoint<ItemReq, F.Dto>
+    {
+        public override void Configure()
+        {
+            Post("/api/orders/{id}/items");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(ItemReq r, CancellationToken ct) =>
+            await Send.OkAsync(
+                await s.Send(
+                    new F.AddItem(r.Id, r.ProductId, r.ProductName, r.UnitPrice, r.Quantity),
+                    ct
+                ),
+                ct
+            );
+    }
+
+    public sealed class RemoveItem(ISender s) : Endpoint<ItemReq, F.Dto>
+    {
+        public override void Configure()
+        {
+            Delete("/api/orders/{id}/items/{itemId}");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(ItemReq r, CancellationToken ct) =>
+            await Send.OkAsync(await s.Send(new F.RemoveItem(r.Id, r.ItemId), ct), ct);
+    }
+
+    public sealed class Submit(ISender s) : Endpoint<IdReq, F.Dto>
+    {
+        public override void Configure()
+        {
+            Post("/api/orders/{id}/submit");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(IdReq r, CancellationToken ct) =>
+            await Send.OkAsync(await s.Send(new F.Submit(r.Id), ct), ct);
+    }
+
+    public sealed class Get(ISender s) : Endpoint<IdReq, F.Dto>
+    {
+        public override void Configure()
+        {
+            Get("/api/orders/{id}");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(IdReq r, CancellationToken ct) =>
+            await Send.OkAsync(await s.Send(new F.GetById(r.Id), ct), ct);
+    }
+
+    public sealed class CustomerOrders(ISender s) : Endpoint<IdReq, IReadOnlyList<F.Dto>>
+    {
+        public override void Configure()
+        {
+            Get("/api/customers/{id}/orders");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(IdReq r, CancellationToken ct) =>
+            await Send.OkAsync(await s.Send(new F.GetCustomerOrders(r.Id), ct), ct);
+    }
+
+    public sealed class Cancel(ISender s) : Endpoint<CancelReq, F.Dto>
+    {
+        public override void Configure()
+        {
+            Post("/api/orders/{id}/cancel");
+            AllowAnonymous();
+        }
+
+        public override async Task HandleAsync(CancelReq r, CancellationToken ct) =>
+            await Send.OkAsync(await s.Send(new F.Cancel(r.Id, r.Reason), ct), ct);
+    }
+}
