@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -8,14 +7,19 @@ namespace OrderFlow.Ordering.Application.Orders;
 
 public static partial class OrderFeatures
 {
-    public sealed class MarkInventoryReservedCommandHandler(IOrderRepository r)
-        : IRequestHandler<MarkInventoryReservedCommand>
+    public sealed class MarkInventoryReservedCommandHandler(
+        IOrderRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<MarkInventoryReservedCommand>
     {
-        public async Task Handle(MarkInventoryReservedCommand c, CancellationToken ct)
+        public async Task Handle(
+            MarkInventoryReservedCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.OrderId, ct);
-            x.MarkInventoryReserved();
-            await r.SaveAsync(ct);
+            var entity = await Find(repository, command.OrderId, cancellationToken);
+            entity.MarkInventoryReserved();
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 }

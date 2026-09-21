@@ -4,17 +4,21 @@ using OrderFlow.Inventory.Domain.Warehouses;
 
 namespace OrderFlow.Inventory.Application.Abstractions.Persistence;
 
-public interface IInventoryRepository
+public interface IInventoryRepository : IRepository<StockItem>, IRepository<Warehouse>
 {
-    Task AddWarehouseAsync(Warehouse warehouse, CancellationToken ct);
-    Task<IReadOnlyList<Warehouse>> ListWarehousesAsync(CancellationToken ct);
-    Task AddStockItemAsync(StockItem item, CancellationToken ct);
-    Task<StockItem?> GetStockAsync(Guid productId, Guid warehouseId, CancellationToken ct);
-    Task<StockItem?> GetBestAvailableStockAsync(Guid productId, CancellationToken ct);
+    Task<IReadOnlyList<Warehouse>> ListWarehousesAsync(CancellationToken cancellationToken);
+    Task<StockItem?> GetStockAsync(
+        Guid productId,
+        Guid warehouseId,
+        CancellationToken cancellationToken
+    );
+    Task<StockItem?> GetBestAvailableStockAsync(
+        Guid productId,
+        CancellationToken cancellationToken
+    );
     Task<IReadOnlyList<StockItem>> GetStockItemsWithPendingReservationsAsync(
         Guid orderId,
-        CancellationToken ct
+        CancellationToken cancellationToken
     );
-    Task<StockReservation?> GetReservationAsync(Guid id, CancellationToken ct);
-    Task SaveAsync(CancellationToken ct);
+    Task<StockReservation?> GetReservationAsync(Guid id, CancellationToken cancellationToken);
 }

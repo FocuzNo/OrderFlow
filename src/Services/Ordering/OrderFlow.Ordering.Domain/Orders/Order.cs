@@ -33,7 +33,7 @@ public sealed class Order : AggregateRoot
 
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
 
-    public decimal TotalAmount => _items.Sum(x => x.Total);
+    public decimal TotalAmount => _items.Sum(candidate => candidate.Total);
 
     public OrderStatus Status { get; private set; } = OrderStatus.Draft;
 
@@ -59,7 +59,7 @@ public sealed class Order : AggregateRoot
     public void AddItem(Guid productId, string productName, decimal unitPrice, int quantity)
     {
         EnsureDraft();
-        var existing = _items.SingleOrDefault(x => x.ProductId == productId);
+        var existing = _items.SingleOrDefault(candidate => candidate.ProductId == productId);
         if (existing is null)
             _items.Add(OrderItem.Create(productId, productName, unitPrice, quantity));
         else
@@ -77,7 +77,7 @@ public sealed class Order : AggregateRoot
     {
         EnsureDraft();
         var item =
-            _items.SingleOrDefault(x => x.Id == itemId)
+            _items.SingleOrDefault(candidate => candidate.Id == itemId)
             ?? throw new DomainException("Order item was not found.");
         _items.Remove(item);
         Touch();
@@ -98,11 +98,11 @@ public sealed class Order : AggregateRoot
                 CustomerId,
                 CustomerEmail.Value,
                 _items
-                    .Select(x => new OrderItemSnapshot(
-                        x.ProductId,
-                        x.ProductName,
-                        x.UnitPrice,
-                        x.Quantity
+                    .Select(candidate => new OrderItemSnapshot(
+                        candidate.ProductId,
+                        candidate.ProductName,
+                        candidate.UnitPrice,
+                        candidate.Quantity
                     ))
                     .ToArray(),
                 TotalAmount

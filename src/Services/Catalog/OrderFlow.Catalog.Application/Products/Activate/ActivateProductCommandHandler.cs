@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -9,14 +7,19 @@ namespace OrderFlow.Catalog.Application.Products;
 
 public static partial class ProductFeatures
 {
-    public sealed class ActivateProductCommandHandler(IProductRepository r)
-        : IRequestHandler<ActivateProductCommand>
+    public sealed class ActivateProductCommandHandler(
+        IProductRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ActivateProductCommand>
     {
-        public async Task Handle(ActivateProductCommand c, CancellationToken ct)
+        public async Task Handle(
+            ActivateProductCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var p = await Find(r, c.Id, ct);
-            p.Activate();
-            await r.SaveAsync(ct);
+            var product = await Find(repository, command.Id, cancellationToken);
+            product.Activate();
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 }

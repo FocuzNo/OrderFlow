@@ -1,13 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OrderFlow.IntegrationContracts;
+using OrderFlow.Ordering.Application.Abstractions.Persistence;
 using OrderFlow.Ordering.Domain.Common;
 using OrderFlow.Ordering.Domain.Orders;
 
 namespace OrderFlow.Ordering.Infrastructure.Persistence;
 
 public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> options)
-    : DbContext(options)
+    : DbContext(options),
+        IUnitOfWork
 {
     public DbSet<Order> Orders => Set<Order>();
 
@@ -17,56 +19,66 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
 
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
-    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var roots = ChangeTracker
             .Entries<AggregateRoot>()
-            .Select(x => x.Entity)
-            .Where(x => x.DomainEvents.Count > 0)
+            .Select(candidate => candidate.Entity)
+            .Where(candidate => candidate.DomainEvents.Count > 0)
             .ToArray();
         foreach (var root in roots)
         {
-            foreach (var e in root.DomainEvents)
+            foreach (var domainEvent in root.DomainEvents)
             {
-                object? payload = e switch
+                object? payload = domainEvent switch
                 {
-                    OrderSubmittedDomainEvent x => new OrderSubmittedIntegrationEvent(
-                        x.OrderId,
-                        x.CustomerId,
-                        x.CustomerEmail,
-                        x.Items.Select(i => new OrderItemContract(
+                    OrderSubmittedDomainEvent candidate => new OrderSubmittedIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.OrderId,
+                        candidate.CustomerId,
+                        candidate.CustomerEmail,
+                        candidate
+                            .Items.Select(i => new OrderItemContract(
                                 i.ProductId,
                                 i.ProductName,
                                 i.UnitPrice,
                                 i.Quantity
                             ))
                             .ToArray(),
-                        x.TotalAmount
+                        candidate.TotalAmount
                     ),
-                    PaymentRequestedDomainEvent x => new PaymentRequestedIntegrationEvent(
-                        x.OrderId,
-                        x.Amount
+                    PaymentRequestedDomainEvent candidate => new PaymentRequestedIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.OrderId,
+                        candidate.Amount
                     ),
-                    OrderConfirmedDomainEvent x => new OrderConfirmedIntegrationEvent(
-                        x.OrderId,
-                        x.CustomerId,
-                        x.CustomerEmail
+                    OrderConfirmedDomainEvent candidate => new OrderConfirmedIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.OrderId,
+                        candidate.CustomerId,
+                        candidate.CustomerEmail
                     ),
-                    OrderCancelledDomainEvent x => new OrderCancelledIntegrationEvent(
-                        x.OrderId,
-                        x.CustomerEmail,
-                        x.Reason
+                    OrderCancelledDomainEvent candidate => new OrderCancelledIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.OrderId,
+                        candidate.CustomerEmail,
+                        candidate.Reason
                     ),
                     _ => null,
                 };
                 if (payload is null)
                     continue;
-                var env = new IntegrationEventEnvelope(
-                    e.EventId,
+                var envelope = new IntegrationEventEnvelope(
+                    domainEvent.EventId,
                     payload.GetType().Name,
                     1,
-                    e.OccurredOnUtc,
-                    System.Diagnostics.Activity.Current?.TraceId.ToString() ?? e.EventId.ToString(),
+                    domainEvent.OccurredOnUtc,
+                    System.Diagnostics.Activity.Current?.TraceId.ToString()
+                        ?? domainEvent.EventId.ToString(),
                     System.Diagnostics.Activity.Current?.SpanId.ToString(),
                     root.Id.ToString(),
                     JsonSerializer.Serialize(payload, payload.GetType())
@@ -74,17 +86,17 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
                 OutboxMessages.Add(
                     new()
                     {
-                        Id = e.EventId,
+                        Id = domainEvent.EventId,
                         Type = KafkaTopics.OrderEvents,
                         AggregateId = root.Id.ToString(),
-                        OccurredOnUtc = e.OccurredOnUtc,
-                        Content = JsonSerializer.Serialize(env),
+                        OccurredOnUtc = domainEvent.OccurredOnUtc,
+                        Content = JsonSerializer.Serialize(envelope),
                     }
                 );
             }
             root.ClearDomainEvents();
         }
-        return await base.SaveChangesAsync(ct);
+        return await base.SaveChangesAsync(cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

@@ -1,6 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-
 namespace OrderFlow.Inventory.Infrastructure.Persistence.Configurations;
 
 public sealed class InboxMessageConfiguration : IEntityTypeConfiguration<InboxMessage>
@@ -8,8 +5,8 @@ public sealed class InboxMessageConfiguration : IEntityTypeConfiguration<InboxMe
     public void Configure(EntityTypeBuilder<InboxMessage> builder)
     {
         builder.ToTable("inbox_messages");
-        builder.HasKey(x => new { x.Id, x.Consumer });
-        builder.Property(x => x.Consumer).HasMaxLength(200);
-        builder.Property(x => x.Error).HasMaxLength(2000);
+        builder.HasKey(candidate => new { candidate.Id, candidate.Consumer });
+        builder.Property(candidate => candidate.Consumer).HasMaxLength(200);
+        builder.Property(candidate => candidate.Error).HasMaxLength(2000);
     }
 }

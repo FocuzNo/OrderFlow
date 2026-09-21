@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Confluent.Kafka;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,11 +18,12 @@ public sealed class PaymentRequestedConsumer(
     ILogger<PaymentRequestedConsumer> logger
 ) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken ct) => Task.Run(() => Consume(ct), ct);
+    protected override Task ExecuteAsync(CancellationToken cancellationToken) =>
+        Task.Run(() => Consume(cancellationToken), cancellationToken);
 
-    private async Task Consume(CancellationToken ct)
+    private async Task Consume(CancellationToken cancellationToken)
     {
-        using var c = new ConsumerBuilder<string, string>(
+        using var consumer = new ConsumerBuilder<string, string>(
             new ConsumerConfig
             {
                 BootstrapServers = options.Value.BootstrapServers,
@@ -32,91 +32,105 @@ public sealed class PaymentRequestedConsumer(
                 AutoOffsetReset = AutoOffsetReset.Earliest,
             }
         ).Build();
-        c.Subscribe(KafkaTopics.OrderEvents);
+        consumer.Subscribe(KafkaTopics.OrderEvents);
         try
         {
-            while (!ct.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var r = c.Consume(ct);
-                await Retry(r, ct);
-                c.Commit(r);
+                var consumeResult = consumer.Consume(cancellationToken);
+                await Retry(consumeResult, cancellationToken);
+                consumer.Commit(consumeResult);
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally
         {
-            c.Close();
+            consumer.Close();
         }
     }
 
-    private async Task Retry(ConsumeResult<string, string> r, CancellationToken ct)
+    private async Task Retry(
+        ConsumeResult<string, string> consumeResult,
+        CancellationToken cancellationToken
+    )
     {
         var max = Math.Max(1, options.Value.MaxRetries);
         for (var attempt = 1; attempt <= max; attempt++)
         {
             try
             {
-                await Handle(r.Message.Value, ct);
+                await Handle(consumeResult.Message.Value, cancellationToken);
                 return;
             }
-            catch (Exception ex) when (attempt < max)
+            catch (Exception exception) when (attempt < max)
             {
                 logger.LogWarning(
-                    ex,
+                    exception,
                     "Payment consumer retry {Attempt}/{MaxAttempts}",
                     attempt,
                     max
                 );
-                await Task.Delay(TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)), ct);
+                await Task.Delay(
+                    TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)),
+                    cancellationToken
+                );
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                logger.LogError(ex, "Payment event exhausted retries and moved to DLT");
+                logger.LogError(exception, "Payment event exhausted retries and moved to DLT");
                 await publisher.PublishAsync(
                     KafkaTopics.DeadLetters,
-                    r.Message.Key,
-                    r.Message.Value,
-                    ct
+                    consumeResult.Message.Key,
+                    consumeResult.Message.Value,
+                    cancellationToken
                 );
             }
         }
     }
 
-    private async Task Handle(string content, CancellationToken ct)
+    private async Task Handle(string content, CancellationToken cancellationToken)
     {
-        var env =
+        var envelope =
             JsonSerializer.Deserialize<IntegrationEventEnvelope>(content)
             ?? throw new JsonException("Envelope is invalid.");
-        if (env.EventType != nameof(PaymentRequestedIntegrationEvent))
+        if (envelope.EventType != nameof(PaymentRequestedIntegrationEvent))
             return;
         await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
+        var databaseContext = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
         if (
-            await db.InboxMessages.AnyAsync(
-                x => x.Id == env.EventId && x.Consumer == options.Value.ConsumerGroup,
-                ct
+            await databaseContext.InboxMessages.AnyAsync(
+                candidate =>
+                    candidate.Id == envelope.EventId
+                    && candidate.Consumer == options.Value.ConsumerGroup,
+                cancellationToken
             )
         )
             return;
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var e =
-            JsonSerializer.Deserialize<PaymentRequestedIntegrationEvent>(env.Payload)
+        await using var transaction = await databaseContext.Database.BeginTransactionAsync(
+            cancellationToken
+        );
+        var integrationEvent =
+            JsonSerializer.Deserialize<PaymentRequestedIntegrationEvent>(envelope.Payload)
             ?? throw new JsonException("Payment event is invalid.");
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         var payment = await sender.Send(
-            new PaymentFeatures.CreatePaymentCommand(e.OrderId, e.Amount, "Card"),
-            ct
+            new PaymentFeatures.CreatePaymentCommand(
+                integrationEvent.OrderId,
+                integrationEvent.Amount,
+                "Card"
+            ),
+            cancellationToken
         );
-        await sender.Send(new PaymentFeatures.ProcessPaymentCommand(payment.Id), ct);
-        db.InboxMessages.Add(
+        await sender.Send(new PaymentFeatures.ProcessPaymentCommand(payment.Id), cancellationToken);
+        databaseContext.InboxMessages.Add(
             new()
             {
-                Id = env.EventId,
+                Id = envelope.EventId,
                 Consumer = options.Value.ConsumerGroup,
                 ProcessedOnUtc = DateTimeOffset.UtcNow,
             }
         );
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        await databaseContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }

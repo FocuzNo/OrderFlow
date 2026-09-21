@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -36,6 +35,9 @@ public static class DependencyInjection
 
         services.AddDbContext<InventoryDbContext>(options =>
             options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
+        );
+        services.AddScoped<IUnitOfWork>(provider =>
+            provider.GetRequiredService<InventoryDbContext>()
         );
         services.AddScoped<IInventoryRepository, InventoryRepository>();
         services.AddSingleton<IKafkaPublisher, KafkaPublisher>();

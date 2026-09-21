@@ -1,49 +1,55 @@
-using Microsoft.EntityFrameworkCore;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
 using OrderFlow.Catalog.Domain.Products;
 
 namespace OrderFlow.Catalog.Infrastructure.Persistence.Repositories;
 
-public sealed class ProductRepository(CatalogDbContext db) : IProductRepository
+public sealed class ProductRepository(CatalogDbContext databaseContext)
+    : Repository<Product>(databaseContext),
+        IProductRepository
 {
-    public Task<Product?> GetByIdAsync(Guid id, CancellationToken ct) =>
-        db.Products.SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        DatabaseContext.Products.SingleOrDefaultAsync(
+            candidate => candidate.Id == id,
+            cancellationToken
+        );
 
     public async Task<IReadOnlyList<Product>> ListAsync(
         int page,
         int size,
         string? search,
         string? sort,
-        CancellationToken ct
+        CancellationToken cancellationToken
     )
     {
-        var q = db.Products.AsNoTracking();
+        var productsQuery = DatabaseContext.Products.AsNoTracking();
         if (!string.IsNullOrWhiteSpace(search))
-            q = q.Where(x => x.Name.Contains(search) || x.Sku.Value.Contains(search));
-        q = sort?.ToLowerInvariant() switch
+            productsQuery = productsQuery.Where(candidate =>
+                candidate.Name.Contains(search) || candidate.Sku.Value.Contains(search)
+            );
+        productsQuery = sort?.ToLowerInvariant() switch
         {
-            "price" => q.OrderBy(x => x.Price.Amount),
-            "price_desc" => q.OrderByDescending(x => x.Price.Amount),
-            "name_desc" => q.OrderByDescending(x => x.Name),
-            _ => q.OrderBy(x => x.Name),
+            "price" => productsQuery.OrderBy(candidate => candidate.Price.Amount),
+            "price_desc" => productsQuery.OrderByDescending(candidate => candidate.Price.Amount),
+            "name_desc" => productsQuery.OrderByDescending(candidate => candidate.Name),
+            _ => productsQuery.OrderBy(candidate => candidate.Name),
         };
-        return await q.Skip((page - 1) * size).Take(size).ToListAsync(ct);
+        return await productsQuery
+            .Skip((page - 1) * size)
+            .Take(size)
+            .ToListAsync(cancellationToken);
     }
 
-    public Task<bool> SkuExistsAsync(string sku, Guid? excluding, CancellationToken ct)
+    public Task<bool> SkuExistsAsync(
+        string sku,
+        Guid? excluding,
+        CancellationToken cancellationToken
+    )
     {
-        var v = Sku.Create(sku);
-        return db.Products.AnyAsync(
-            x => x.Sku == v && (!excluding.HasValue || x.Id != excluding),
-            ct
+        var skuValue = Sku.Create(sku);
+        return DatabaseContext.Products.AnyAsync(
+            candidate =>
+                candidate.Sku == skuValue && (!excluding.HasValue || candidate.Id != excluding),
+            cancellationToken
         );
     }
-
-    public async Task AddAsync(Product x, CancellationToken ct)
-    {
-        db.Products.Add(x);
-        await db.SaveChangesAsync(ct);
-    }
-
-    public async Task SaveAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
 }

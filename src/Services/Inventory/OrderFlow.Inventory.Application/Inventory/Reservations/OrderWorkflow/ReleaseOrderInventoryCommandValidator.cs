@@ -5,6 +5,7 @@ public static partial class InventoryFeatures
     public sealed class ReleaseOrderInventoryCommandValidator
         : AbstractValidator<ReleaseOrderInventoryCommand>
     {
-        public ReleaseOrderInventoryCommandValidator() => RuleFor(x => x.OrderId).NotEmpty();
+        public ReleaseOrderInventoryCommandValidator() =>
+            RuleFor(candidate => candidate.OrderId).NotEmpty();
     }
 }

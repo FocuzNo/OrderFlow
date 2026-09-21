@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Confluent.Kafka;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,9 +18,10 @@ public sealed class WorkflowConsumer(
     ILogger<WorkflowConsumer> logger
 ) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken ct) => Task.Run(() => Consume(ct), ct);
+    protected override Task ExecuteAsync(CancellationToken cancellationToken) =>
+        Task.Run(() => Consume(cancellationToken), cancellationToken);
 
-    private async Task Consume(CancellationToken ct)
+    private async Task Consume(CancellationToken cancellationToken)
     {
         using var consumer = new ConsumerBuilder<string, string>(
             new ConsumerConfig
@@ -35,28 +35,31 @@ public sealed class WorkflowConsumer(
         consumer.Subscribe([KafkaTopics.InventoryEvents, KafkaTopics.PaymentEvents]);
         try
         {
-            while (!ct.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                var result = consumer.Consume(ct);
-                await HandleWithRetry(result, ct);
+                var result = consumer.Consume(cancellationToken);
+                await HandleWithRetry(result, cancellationToken);
                 consumer.Commit(result);
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally
         {
             consumer.Close();
         }
     }
 
-    private async Task HandleWithRetry(ConsumeResult<string, string> result, CancellationToken ct)
+    private async Task HandleWithRetry(
+        ConsumeResult<string, string> result,
+        CancellationToken cancellationToken
+    )
     {
         var attempts = Math.Max(1, options.Value.MaxRetries);
         for (var attempt = 1; attempt <= attempts; attempt++)
         {
             try
             {
-                await Handle(result.Message.Value, ct);
+                await Handle(result.Message.Value, cancellationToken);
                 return;
             }
             catch (Exception exception) when (attempt < attempts)
@@ -67,7 +70,10 @@ public sealed class WorkflowConsumer(
                     attempt,
                     attempts
                 );
-                await Task.Delay(TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)), ct);
+                await Task.Delay(
+                    TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)),
+                    cancellationToken
+                );
             }
             catch (Exception exception)
             {
@@ -79,27 +85,31 @@ public sealed class WorkflowConsumer(
                     KafkaTopics.DeadLetters,
                     result.Message.Key,
                     result.Message.Value,
-                    ct
+                    cancellationToken
                 );
             }
         }
     }
 
-    private async Task Handle(string content, CancellationToken ct)
+    private async Task Handle(string content, CancellationToken cancellationToken)
     {
         var envelope =
             JsonSerializer.Deserialize<IntegrationEventEnvelope>(content)
             ?? throw new JsonException("Envelope is invalid.");
         await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<OrderingDbContext>();
+        var databaseContext = scope.ServiceProvider.GetRequiredService<OrderingDbContext>();
         if (
-            await db.InboxMessages.AnyAsync(
-                x => x.Id == envelope.EventId && x.Consumer == options.Value.ConsumerGroup,
-                ct
+            await databaseContext.InboxMessages.AnyAsync(
+                candidate =>
+                    candidate.Id == envelope.EventId
+                    && candidate.Consumer == options.Value.ConsumerGroup,
+                cancellationToken
             )
         )
             return;
-        await using var transaction = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await databaseContext.Database.BeginTransactionAsync(
+            cancellationToken
+        );
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         switch (envelope.EventType)
         {
@@ -110,7 +120,7 @@ public sealed class WorkflowConsumer(
                             .Deserialize<InventoryReservedIntegrationEvent>(envelope.Payload)!
                             .OrderId
                     ),
-                    ct
+                    cancellationToken
                 );
                 break;
             case nameof(InventoryReservationFailedIntegrationEvent):
@@ -123,7 +133,7 @@ public sealed class WorkflowConsumer(
                         inventoryFailed.OrderId,
                         inventoryFailed.Reason
                     ),
-                    ct
+                    cancellationToken
                 );
                 break;
             case nameof(PaymentSucceededIntegrationEvent):
@@ -133,7 +143,7 @@ public sealed class WorkflowConsumer(
                             .Deserialize<PaymentSucceededIntegrationEvent>(envelope.Payload)!
                             .OrderId
                     ),
-                    ct
+                    cancellationToken
                 );
                 break;
             case nameof(PaymentFailedIntegrationEvent):
@@ -145,13 +155,13 @@ public sealed class WorkflowConsumer(
                         paymentFailed.OrderId,
                         paymentFailed.Reason
                     ),
-                    ct
+                    cancellationToken
                 );
                 break;
             default:
                 return;
         }
-        db.InboxMessages.Add(
+        databaseContext.InboxMessages.Add(
             new()
             {
                 Id = envelope.EventId,
@@ -159,7 +169,7 @@ public sealed class WorkflowConsumer(
                 ProcessedOnUtc = DateTimeOffset.UtcNow,
             }
         );
-        await db.SaveChangesAsync(ct);
-        await transaction.CommitAsync(ct);
+        await databaseContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }

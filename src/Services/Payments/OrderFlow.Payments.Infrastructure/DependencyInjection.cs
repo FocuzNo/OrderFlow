@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -41,6 +40,9 @@ public static class DependencyInjection
         );
         services.AddDbContext<PaymentsDbContext>(options =>
             options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
+        );
+        services.AddScoped<IUnitOfWork>(provider =>
+            provider.GetRequiredService<PaymentsDbContext>()
         );
         services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddSingleton<IPaymentGateway, DevelopmentPaymentGateway>();

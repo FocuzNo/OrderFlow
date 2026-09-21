@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -8,32 +7,38 @@ namespace OrderFlow.Ordering.Application.Orders;
 
 public static partial class OrderFeatures
 {
-    private static async Task<Order> Find(IOrderRepository r, Guid id, CancellationToken ct) =>
-        await r.GetAsync(id, ct) ?? throw new NotFoundException("Order was not found.");
+    private static async Task<Order> Find(
+        IOrderRepository repository,
+        Guid id,
+        CancellationToken cancellationToken
+    ) =>
+        await repository.GetByIdAsync(id, cancellationToken)
+        ?? throw new NotFoundException("Order was not found.");
 
-    private static OrderResponse Map(Order x) =>
+    private static OrderResponse Map(Order entity) =>
         new(
-            x.Id,
-            x.CustomerId,
-            x.CustomerEmail.Value,
+            entity.Id,
+            entity.CustomerId,
+            entity.CustomerEmail.Value,
             new(
-                x.ShippingAddress.Line1,
-                x.ShippingAddress.City,
-                x.ShippingAddress.PostalCode,
-                x.ShippingAddress.Country
+                entity.ShippingAddress.Line1,
+                entity.ShippingAddress.City,
+                entity.ShippingAddress.PostalCode,
+                entity.ShippingAddress.Country
             ),
-            x.Items.Select(i => new OrderItemResponse(
-                    i.Id,
-                    i.ProductId,
-                    i.ProductName,
-                    i.UnitPrice,
-                    i.Quantity,
-                    i.Total
+            entity
+                .Items.Select(orderItem => new OrderItemResponse(
+                    orderItem.Id,
+                    orderItem.ProductId,
+                    orderItem.ProductName,
+                    orderItem.UnitPrice,
+                    orderItem.Quantity,
+                    orderItem.Total
                 ))
                 .ToArray(),
-            x.TotalAmount,
-            x.Status.Name,
-            x.CreatedAt,
-            x.UpdatedAt
+            entity.TotalAmount,
+            entity.Status.Name,
+            entity.CreatedAt,
+            entity.UpdatedAt
         );
 }

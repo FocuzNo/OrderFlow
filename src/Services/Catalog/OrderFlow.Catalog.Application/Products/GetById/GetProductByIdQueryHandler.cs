@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -12,9 +10,12 @@ public static partial class ProductFeatures
     public sealed class GetProductByIdQueryHandler(IProductRepository repository)
         : IRequestHandler<GetProductByIdQuery, ProductResponse>
     {
-        public async Task<ProductResponse> Handle(GetProductByIdQuery q, CancellationToken ct) =>
+        public async Task<ProductResponse> Handle(
+            GetProductByIdQuery q,
+            CancellationToken cancellationToken
+        ) =>
             ProductResponse.From(
-                await repository.GetByIdAsync(q.Id, ct)
+                await repository.GetByIdAsync(q.Id, cancellationToken)
                     ?? throw new NotFoundException("Product was not found.")
             );
     }

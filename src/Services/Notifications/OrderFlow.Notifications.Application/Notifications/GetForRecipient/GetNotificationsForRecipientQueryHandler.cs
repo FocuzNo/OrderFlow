@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;
@@ -9,12 +8,15 @@ namespace OrderFlow.Notifications.Application.Notifications;
 
 public static partial class NotificationFeatures
 {
-    public sealed class GetNotificationsForRecipientQueryHandler(INotificationRepository r)
+    public sealed class GetNotificationsForRecipientQueryHandler(INotificationRepository repository)
         : IRequestHandler<GetNotificationsForRecipientQuery, IReadOnlyList<NotificationResponse>>
     {
         public async Task<IReadOnlyList<NotificationResponse>> Handle(
             GetNotificationsForRecipientQuery q,
-            CancellationToken ct
-        ) => (await r.GetForRecipientAsync(q.Recipient, ct)).Select(Map).ToArray();
+            CancellationToken cancellationToken
+        ) =>
+            (await repository.GetForRecipientAsync(q.Recipient, cancellationToken))
+                .Select(Map)
+                .ToArray();
     }
 }

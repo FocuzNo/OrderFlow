@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -36,6 +35,9 @@ public static class DependencyInjection
 
         services.AddDbContext<OrderingDbContext>(options =>
             options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
+        );
+        services.AddScoped<IUnitOfWork>(provider =>
+            provider.GetRequiredService<OrderingDbContext>()
         );
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddSingleton<IKafkaPublisher, KafkaPublisher>();

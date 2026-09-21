@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -11,17 +9,21 @@ public static partial class ProductFeatures
 {
     public sealed class UpdateProductCommandHandler(
         IProductRepository products,
-        ICategoryRepository categories
+        ICategoryRepository categories,
+        IUnitOfWork unitOfWork
     ) : IRequestHandler<UpdateProductCommand, ProductResponse>
     {
-        public async Task<ProductResponse> Handle(UpdateProductCommand c, CancellationToken ct)
+        public async Task<ProductResponse> Handle(
+            UpdateProductCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var p = await Find(products, c.Id, ct);
-            if (await categories.GetByIdAsync(c.CategoryId, ct) is null)
+            var product = await Find(products, command.Id, cancellationToken);
+            if (await categories.GetByIdAsync(command.CategoryId, cancellationToken) is null)
                 throw new NotFoundException("Category was not found.");
-            p.Update(c.Name, c.Description, c.CategoryId);
-            await products.SaveAsync(ct);
-            return ProductResponse.From(p);
+            product.Update(command.Name, command.Description, command.CategoryId);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return ProductResponse.From(product);
         }
     }
 }

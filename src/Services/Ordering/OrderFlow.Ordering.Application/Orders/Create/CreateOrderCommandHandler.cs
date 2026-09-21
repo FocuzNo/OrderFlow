@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -8,20 +7,26 @@ namespace OrderFlow.Ordering.Application.Orders;
 
 public static partial class OrderFeatures
 {
-    public sealed class CreateOrderCommandHandler(IOrderRepository r)
-        : IRequestHandler<CreateOrderCommand, OrderResponse>
+    public sealed class CreateOrderCommandHandler(
+        IOrderRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<CreateOrderCommand, OrderResponse>
     {
-        public async Task<OrderResponse> Handle(CreateOrderCommand c, CancellationToken ct)
+        public async Task<OrderResponse> Handle(
+            CreateOrderCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var a = ShippingAddress.Create(
-                c.ShippingAddress.Line1,
-                c.ShippingAddress.City,
-                c.ShippingAddress.PostalCode,
-                c.ShippingAddress.Country
+            var shippingAddress = ShippingAddress.Create(
+                command.ShippingAddress.Line1,
+                command.ShippingAddress.City,
+                command.ShippingAddress.PostalCode,
+                command.ShippingAddress.Country
             );
-            var x = Order.Create(c.CustomerId, c.CustomerEmail, a);
-            await r.AddAsync(x, ct);
-            return Map(x);
+            var entity = Order.Create(command.CustomerId, command.CustomerEmail, shippingAddress);
+            await repository.AddAsync(entity, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;

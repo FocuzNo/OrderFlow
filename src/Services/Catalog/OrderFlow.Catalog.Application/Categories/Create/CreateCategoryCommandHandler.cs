@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -8,15 +7,21 @@ namespace OrderFlow.Catalog.Application.Categories;
 
 public static partial class CategoryFeatures
 {
-    public sealed class CreateCategoryCommandHandler(ICategoryRepository r)
-        : IRequestHandler<CreateCategoryCommand, CategoryResponse>
+    public sealed class CreateCategoryCommandHandler(
+        ICategoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<CreateCategoryCommand, CategoryResponse>
     {
-        public async Task<CategoryResponse> Handle(CreateCategoryCommand c, CancellationToken ct)
+        public async Task<CategoryResponse> Handle(
+            CreateCategoryCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            if (await r.NameExistsAsync(c.Name, null, ct))
+            if (await repository.NameExistsAsync(command.Name, null, cancellationToken))
                 throw new ConflictException("Category name already exists.");
-            var entity = Category.Create(c.Name, c.Description);
-            await r.AddAsync(entity, ct);
+            var entity = Category.Create(command.Name, command.Description);
+            await repository.AddAsync(entity, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             return CategoryResponse.From(entity);
         }
     }

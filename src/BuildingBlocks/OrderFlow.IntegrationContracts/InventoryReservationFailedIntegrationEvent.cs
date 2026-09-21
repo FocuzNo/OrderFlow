@@ -1,3 +1,8 @@
 namespace OrderFlow.IntegrationContracts;
 
-public sealed record InventoryReservationFailedIntegrationEvent(Guid OrderId, string Reason);
+public sealed record InventoryReservationFailedIntegrationEvent(
+    Guid EventId,
+    DateTimeOffset OccurredAt,
+    Guid OrderId,
+    string Reason
+);

@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Notifications.Application.Notifications.NotificationFeatures;
 
 namespace OrderFlow.Notifications.Api.Endpoints;
 
 public static partial class NotificationEndpoints
 {
-    public sealed class SendNotificationEndpoint(ISender s)
+    public sealed class SendNotificationEndpoint(ISender sender)
         : Endpoint<NotificationIdRequest, F.NotificationResponse>
     {
         public override void Configure()
@@ -15,7 +13,13 @@ public static partial class NotificationEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(NotificationIdRequest r, CancellationToken ct) =>
-            await Send.OkAsync(await s.Send(new F.SendNotificationCommand(r.Id), ct), ct);
+        public override async Task HandleAsync(
+            NotificationIdRequest request,
+            CancellationToken cancellationToken
+        ) =>
+            await Send.OkAsync(
+                await sender.Send(new F.SendNotificationCommand(request.Id), cancellationToken),
+                cancellationToken
+            );
     }
 }

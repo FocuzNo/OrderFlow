@@ -81,11 +81,11 @@ public sealed class Payment : AggregateRoot
     {
         if (Status != PaymentStatus.Succeeded)
             throw new DomainException("Only successful payments can be refunded.");
-        if (_refunds.Sum(x => x.Amount) + amount > Amount)
+        if (_refunds.Sum(candidate => candidate.Amount) + amount > Amount)
             throw new DomainException("Refund exceeds the captured amount.");
         var refund = Payments.Refund.Create(amount, reason);
         _refunds.Add(refund);
-        if (_refunds.Sum(x => x.Amount) == Amount)
+        if (_refunds.Sum(candidate => candidate.Amount) == Amount)
             Status = PaymentStatus.Refunded;
         Touch();
         return refund;

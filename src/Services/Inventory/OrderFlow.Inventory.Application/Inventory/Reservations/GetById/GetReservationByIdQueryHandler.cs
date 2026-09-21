@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -9,15 +8,15 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class GetReservationByIdQueryHandler(IInventoryRepository r)
+    public sealed class GetReservationByIdQueryHandler(IInventoryRepository repository)
         : IRequestHandler<GetReservationByIdQuery, ReservationResponse>
     {
         public async Task<ReservationResponse> Handle(
             GetReservationByIdQuery q,
-            CancellationToken ct
+            CancellationToken cancellationToken
         ) =>
             Map(
-                await r.GetReservationAsync(q.Id, ct)
+                await repository.GetReservationAsync(q.Id, cancellationToken)
                     ?? throw new NotFoundException("Reservation was not found.")
             );
     }

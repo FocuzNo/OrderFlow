@@ -5,8 +5,10 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class ReserveOrderInventoryCommandHandler(IInventoryRepository repository)
-        : IRequestHandler<ReserveOrderInventoryCommand, InventoryReservationResult>
+    public sealed class ReserveOrderInventoryCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ReserveOrderInventoryCommand, InventoryReservationResult>
     {
         public async Task<InventoryReservationResult> Handle(
             ReserveOrderInventoryCommand command,
@@ -44,7 +46,7 @@ public static partial class InventoryFeatures
                 .Select(item => item.Stock.Reserve(command.OrderId, item.Quantity).Id)
                 .ToArray();
 
-            await repository.SaveAsync(cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             return new InventoryReservationResult(true, reservationIds, null);
         }
     }

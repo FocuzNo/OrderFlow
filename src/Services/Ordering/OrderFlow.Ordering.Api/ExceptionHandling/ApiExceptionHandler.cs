@@ -7,19 +7,26 @@ namespace OrderFlow.Ordering.Api.ExceptionHandling;
 
 public sealed class ApiExceptionHandler : IExceptionHandler
 {
-    public async ValueTask<bool> TryHandleAsync(HttpContext c, Exception e, CancellationToken ct)
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken cancellationToken
+    )
     {
-        if (e is ValidationException v)
+        if (exception is ValidationException v)
         {
             await Results
                 .ValidationProblem(
-                    v.Errors.GroupBy(x => x.PropertyName)
-                        .ToDictionary(x => x.Key, x => x.Select(y => y.ErrorMessage).ToArray())
+                    v.Errors.GroupBy(candidate => candidate.PropertyName)
+                        .ToDictionary(
+                            candidate => candidate.Key,
+                            candidate => candidate.Select(failure => failure.ErrorMessage).ToArray()
+                        )
                 )
-                .ExecuteAsync(c);
+                .ExecuteAsync(httpContext);
             return true;
         }
-        var status = e switch
+        var status = exception switch
         {
             NotFoundException => 404,
             ConflictException => 409,
@@ -34,9 +41,9 @@ public sealed class ApiExceptionHandler : IExceptionHandler
                 title: status == 404 ? "Resource not found"
                     : status == 409 ? "Conflict"
                     : "Business rule violation",
-                detail: e.Message
+                detail: exception.Message
             )
-            .ExecuteAsync(c);
+            .ExecuteAsync(httpContext);
         return true;
     }
 }

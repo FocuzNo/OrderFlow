@@ -1,12 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OrderFlow.IntegrationContracts;
+using OrderFlow.Payments.Application.Abstractions.Persistence;
 using OrderFlow.Payments.Domain.Common;
 using OrderFlow.Payments.Domain.Payments;
 
 namespace OrderFlow.Payments.Infrastructure.Persistence;
 
-public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> o) : DbContext(o)
+public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> options)
+    : DbContext(options),
+        IUnitOfWork
 {
     public DbSet<Payment> Payments => Set<Payment>();
 
@@ -16,61 +19,68 @@ public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> o) : D
 
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
-    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var roots = ChangeTracker
             .Entries<AggregateRoot>()
-            .Select(x => x.Entity)
-            .Where(x => x.DomainEvents.Count > 0)
+            .Select(candidate => candidate.Entity)
+            .Where(candidate => candidate.DomainEvents.Count > 0)
             .ToArray();
         foreach (var root in roots)
         {
-            foreach (var e in root.DomainEvents)
+            foreach (var domainEvent in root.DomainEvents)
             {
-                object? p = e switch
+                object? payload = domainEvent switch
                 {
-                    PaymentRequestedDomainEvent x => new PaymentRequestedIntegrationEvent(
-                        x.OrderId,
-                        x.Amount
+                    PaymentRequestedDomainEvent candidate => new PaymentRequestedIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.OrderId,
+                        candidate.Amount
                     ),
-                    PaymentSucceededDomainEvent x => new PaymentSucceededIntegrationEvent(
-                        x.PaymentId,
-                        x.OrderId,
-                        x.Amount
+                    PaymentSucceededDomainEvent candidate => new PaymentSucceededIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.PaymentId,
+                        candidate.OrderId,
+                        candidate.Amount
                     ),
-                    PaymentFailedDomainEvent x => new PaymentFailedIntegrationEvent(
-                        x.PaymentId,
-                        x.OrderId,
-                        x.Reason
+                    PaymentFailedDomainEvent candidate => new PaymentFailedIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.PaymentId,
+                        candidate.OrderId,
+                        candidate.Reason
                     ),
                     _ => null,
                 };
-                if (p is null)
+                if (payload is null)
                     continue;
-                var env = new IntegrationEventEnvelope(
-                    e.EventId,
-                    p.GetType().Name,
+                var envelope = new IntegrationEventEnvelope(
+                    domainEvent.EventId,
+                    payload.GetType().Name,
                     1,
-                    e.OccurredOnUtc,
-                    System.Diagnostics.Activity.Current?.TraceId.ToString() ?? e.EventId.ToString(),
+                    domainEvent.OccurredOnUtc,
+                    System.Diagnostics.Activity.Current?.TraceId.ToString()
+                        ?? domainEvent.EventId.ToString(),
                     System.Diagnostics.Activity.Current?.SpanId.ToString(),
                     root.Id.ToString(),
-                    JsonSerializer.Serialize(p, p.GetType())
+                    JsonSerializer.Serialize(payload, payload.GetType())
                 );
                 OutboxMessages.Add(
                     new()
                     {
-                        Id = e.EventId,
+                        Id = domainEvent.EventId,
                         Type = KafkaTopics.PaymentEvents,
                         AggregateId = root.Id.ToString(),
-                        OccurredOnUtc = e.OccurredOnUtc,
-                        Content = JsonSerializer.Serialize(env),
+                        OccurredOnUtc = domainEvent.OccurredOnUtc,
+                        Content = JsonSerializer.Serialize(envelope),
                     }
                 );
             }
             root.ClearDomainEvents();
         }
-        return await base.SaveChangesAsync(ct);
+        return await base.SaveChangesAsync(cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

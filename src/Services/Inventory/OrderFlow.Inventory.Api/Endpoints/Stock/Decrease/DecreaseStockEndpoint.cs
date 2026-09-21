@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Inventory.Application.Inventory.InventoryFeatures;
 
 namespace OrderFlow.Inventory.Api.Endpoints;
 
 public static partial class InventoryEndpoints
 {
-    public sealed class DecreaseStockEndpoint(ISender s)
+    public sealed class DecreaseStockEndpoint(ISender sender)
         : Endpoint<AdjustStockRequest, F.StockResponse>
     {
         public override void Configure()
@@ -15,13 +13,20 @@ public static partial class InventoryEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(AdjustStockRequest r, CancellationToken ct) =>
+        public override async Task HandleAsync(
+            AdjustStockRequest request,
+            CancellationToken cancellationToken
+        ) =>
             await Send.OkAsync(
-                await s.Send(
-                    new F.DecreaseStockCommand(r.ProductId, r.WarehouseId, r.Quantity),
-                    ct
+                await sender.Send(
+                    new F.DecreaseStockCommand(
+                        request.ProductId,
+                        request.WarehouseId,
+                        request.Quantity
+                    ),
+                    cancellationToken
                 ),
-                ct
+                cancellationToken
             );
     }
 }

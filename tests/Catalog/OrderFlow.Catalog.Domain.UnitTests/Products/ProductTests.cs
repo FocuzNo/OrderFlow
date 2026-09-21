@@ -16,7 +16,7 @@ public sealed class ProductTests
         Assert.Equal("SKU-1", product.Sku.Value);
         Assert.Equal(12.50m, product.Price.Amount);
         Assert.Equal(ProductStatus.Draft, product.Status);
-        Assert.Contains(product.DomainEvents, x => x is ProductCreatedDomainEvent);
+        Assert.Contains(product.DomainEvents, candidate => candidate is ProductCreatedDomainEvent);
     }
 
     [Theory]
@@ -33,7 +33,10 @@ public sealed class ProductTests
         product.ChangePrice(15m);
         product.Archive();
 
-        Assert.Contains(product.DomainEvents, x => x is ProductPriceChangedDomainEvent);
+        Assert.Contains(
+            product.DomainEvents,
+            candidate => candidate is ProductPriceChangedDomainEvent
+        );
         Assert.Equal(ProductStatus.Archived, product.Status);
         Assert.Throws<DomainException>(() => product.ChangePrice(20m));
     }

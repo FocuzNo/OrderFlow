@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Notifications.Application.Notifications;
 
 public sealed class CreateNotificationCommandValidator
@@ -7,9 +5,9 @@ public sealed class CreateNotificationCommandValidator
 {
     public CreateNotificationCommandValidator()
     {
-        RuleFor(x => x.Recipient).NotEmpty().EmailAddress().MaximumLength(320);
-        RuleFor(x => x.Subject).NotEmpty().MaximumLength(250);
-        RuleFor(x => x.Body).NotEmpty().MaximumLength(10000);
-        RuleFor(x => x.Channel).Equal("Email", StringComparer.OrdinalIgnoreCase);
+        RuleFor(candidate => candidate.Recipient).NotEmpty().EmailAddress().MaximumLength(320);
+        RuleFor(candidate => candidate.Subject).NotEmpty().MaximumLength(250);
+        RuleFor(candidate => candidate.Body).NotEmpty().MaximumLength(10000);
+        RuleFor(candidate => candidate.Channel).Equal("Email", StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -19,9 +19,9 @@ public sealed class KafkaHealthCheck(IOptions<KafkaOptions> options) : IHealthCh
             _ = admin.GetMetadata(TimeSpan.FromSeconds(3));
             return Task.FromResult(HealthCheckResult.Healthy());
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            return Task.FromResult(HealthCheckResult.Unhealthy("Kafka is unavailable.", e));
+            return Task.FromResult(HealthCheckResult.Unhealthy("Kafka is unavailable.", exception));
         }
     }
 }

@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -25,48 +24,56 @@ public sealed class OutboxProcessor(
             {
                 break;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
-                logger.LogError(ex, "Outbox batch failed for Catalog");
+                logger.LogError(exception, "Outbox batch failed for Catalog");
             }
             await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
         }
     }
 
-    private async Task ProcessBatch(CancellationToken ct)
+    private async Task ProcessBatch(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
+        var databaseContext = scope.ServiceProvider.GetRequiredService<CatalogDbContext>();
         var publisher = scope.ServiceProvider.GetRequiredService<IKafkaPublisher>();
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
-        var rows = await db
+        await using var transaction = await databaseContext.Database.BeginTransactionAsync(
+            cancellationToken
+        );
+        var rows = await databaseContext
             .OutboxMessages.FromSqlRaw(
                 "SELECT * FROM outbox_messages WHERE processed_on_utc IS NULL AND retry_count < {0} ORDER BY occurred_on_utc LIMIT {1} FOR UPDATE SKIP LOCKED",
                 options.Value.MaxRetries,
                 options.Value.OutboxBatchSize
             )
-            .ToListAsync(ct);
+            .ToListAsync(cancellationToken);
         foreach (var row in rows)
         {
             try
             {
-                await publisher.PublishAsync(row.Type, row.AggregateId, row.Content, ct);
+                await publisher.PublishAsync(
+                    row.Type,
+                    row.AggregateId,
+                    row.Content,
+                    cancellationToken
+                );
                 row.ProcessedOnUtc = DateTimeOffset.UtcNow;
                 row.Error = null;
             }
-            catch (Exception ex)
+            catch (Exception exception)
             {
                 row.RetryCount++;
-                row.Error = ex.Message.Length > 2000 ? ex.Message[..2000] : ex.Message;
+                row.Error =
+                    exception.Message.Length > 2000 ? exception.Message[..2000] : exception.Message;
                 logger.LogWarning(
-                    ex,
+                    exception,
                     "Failed to publish outbox message {MessageId} attempt {RetryCount}",
                     row.Id,
                     row.RetryCount
                 );
             }
         }
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        await databaseContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 }

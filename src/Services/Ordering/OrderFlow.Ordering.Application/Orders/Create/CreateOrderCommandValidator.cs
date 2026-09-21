@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Ordering.Application.Orders;
 
 public sealed class CreateOrderCommandValidator
@@ -7,11 +5,11 @@ public sealed class CreateOrderCommandValidator
 {
     public CreateOrderCommandValidator()
     {
-        RuleFor(x => x.CustomerId).NotEmpty();
-        RuleFor(x => x.CustomerEmail).NotEmpty().EmailAddress().MaximumLength(320);
-        RuleFor(x => x.ShippingAddress.Line1).NotEmpty();
-        RuleFor(x => x.ShippingAddress.City).NotEmpty();
-        RuleFor(x => x.ShippingAddress.PostalCode).NotEmpty();
-        RuleFor(x => x.ShippingAddress.Country).NotEmpty();
+        RuleFor(candidate => candidate.CustomerId).NotEmpty();
+        RuleFor(candidate => candidate.CustomerEmail).NotEmpty().EmailAddress().MaximumLength(320);
+        RuleFor(candidate => candidate.ShippingAddress.Line1).NotEmpty();
+        RuleFor(candidate => candidate.ShippingAddress.City).NotEmpty();
+        RuleFor(candidate => candidate.ShippingAddress.PostalCode).NotEmpty();
+        RuleFor(candidate => candidate.ShippingAddress.Country).NotEmpty();
     }
 }

@@ -64,7 +64,11 @@ public sealed class StockItem : AggregateRoot
         EnsurePositive(quantity);
         if (orderId == Guid.Empty)
             throw new DomainException("Order is required.");
-        if (_reservations.Any(x => x.OrderId == orderId && x.Status == ReservationStatus.Pending))
+        if (
+            _reservations.Any(candidate =>
+                candidate.OrderId == orderId && candidate.Status == ReservationStatus.Pending
+            )
+        )
             throw new DomainException(
                 "Order already has an active reservation for this stock item."
             );
@@ -112,7 +116,7 @@ public sealed class StockItem : AggregateRoot
     }
 
     private StockReservation Find(Guid id) =>
-        _reservations.SingleOrDefault(x => x.Id == id)
+        _reservations.SingleOrDefault(candidate => candidate.Id == id)
         ?? throw new DomainException("Reservation was not found on this stock item.");
 
     private static void EnsurePositive(int quantity)

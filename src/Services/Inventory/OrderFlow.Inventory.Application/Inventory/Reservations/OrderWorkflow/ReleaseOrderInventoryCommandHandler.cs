@@ -5,8 +5,10 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class ReleaseOrderInventoryCommandHandler(IInventoryRepository repository)
-        : IRequestHandler<ReleaseOrderInventoryCommand>
+    public sealed class ReleaseOrderInventoryCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ReleaseOrderInventoryCommand>
     {
         public async Task Handle(
             ReleaseOrderInventoryCommand command,
@@ -32,7 +34,7 @@ public static partial class InventoryFeatures
                     stockItem.Release(reservationId);
             }
 
-            await repository.SaveAsync(cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 }

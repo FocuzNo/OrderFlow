@@ -21,7 +21,7 @@ public sealed class OrderTests
 
         Assert.Equal(OrderStatus.PendingInventory, order.Status);
         Assert.Equal(25m, order.TotalAmount);
-        Assert.Contains(order.DomainEvents, x => x is OrderSubmittedDomainEvent);
+        Assert.Contains(order.DomainEvents, candidate => candidate is OrderSubmittedDomainEvent);
     }
 
     [Fact]

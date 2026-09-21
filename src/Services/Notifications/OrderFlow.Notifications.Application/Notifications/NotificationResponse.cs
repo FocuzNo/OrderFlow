@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;

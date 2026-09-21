@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,20 +8,26 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed class ProcessPaymentCommandHandler(IPaymentRepository r, IPaymentGateway gateway)
-        : IRequestHandler<ProcessPaymentCommand, PaymentResponse>
+    public sealed class ProcessPaymentCommandHandler(
+        IPaymentRepository repository,
+        IPaymentGateway gateway,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ProcessPaymentCommand, PaymentResponse>
     {
-        public async Task<PaymentResponse> Handle(ProcessPaymentCommand c, CancellationToken ct)
+        public async Task<PaymentResponse> Handle(
+            ProcessPaymentCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.PaymentId, ct);
-            x.StartProcessing();
-            var result = await gateway.ChargeAsync(x.Id, x.Amount, ct);
+            var entity = await Find(repository, command.PaymentId, cancellationToken);
+            entity.StartProcessing();
+            var result = await gateway.ChargeAsync(entity.Id, entity.Amount, cancellationToken);
             if (result.Succeeded)
-                x.Succeed(result.Reference ?? $"DEV-{x.Id:N}");
+                entity.Succeed(result.Reference ?? $"DEV-{entity.Id:N}");
             else
-                x.Fail(result.Error ?? "Payment declined.");
-            await r.SaveAsync(ct);
-            return Map(x);
+                entity.Fail(result.Error ?? "Payment declined.");
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

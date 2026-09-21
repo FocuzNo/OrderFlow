@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using OrderFlow.Catalog.Application.Abstractions.Persistence;
 using OrderFlow.Catalog.Domain.Categories;
 using OrderFlow.Catalog.Domain.Common;
 using OrderFlow.Catalog.Domain.Products;
@@ -7,7 +8,9 @@ using OrderFlow.IntegrationContracts;
 
 namespace OrderFlow.Catalog.Infrastructure.Persistence;
 
-public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> o) : DbContext(o)
+public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> options)
+    : DbContext(options),
+        IUnitOfWork
 {
     public DbSet<Product> Products => Set<Product>();
 
@@ -17,59 +20,65 @@ public sealed class CatalogDbContext(DbContextOptions<CatalogDbContext> o) : DbC
 
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
-    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var roots = ChangeTracker
             .Entries<AggregateRoot>()
-            .Select(x => x.Entity)
-            .Where(x => x.DomainEvents.Count > 0)
+            .Select(candidate => candidate.Entity)
+            .Where(candidate => candidate.DomainEvents.Count > 0)
             .ToArray();
         foreach (var root in roots)
         {
-            foreach (var e in root.DomainEvents)
+            foreach (var domainEvent in root.DomainEvents)
             {
-                object? p = e switch
+                object? payload = domainEvent switch
                 {
-                    ProductCreatedDomainEvent x => new CatalogProductCreatedIntegrationEvent(
-                        x.ProductId,
-                        x.Sku,
-                        x.Name,
-                        x.Price
-                    ),
-                    ProductPriceChangedDomainEvent x =>
+                    ProductCreatedDomainEvent candidate =>
+                        new CatalogProductCreatedIntegrationEvent(
+                            domainEvent.EventId,
+                            domainEvent.OccurredOnUtc,
+                            candidate.ProductId,
+                            candidate.Sku,
+                            candidate.Name,
+                            candidate.Price
+                        ),
+                    ProductPriceChangedDomainEvent candidate =>
                         new CatalogProductPriceChangedIntegrationEvent(
-                            x.ProductId,
-                            x.OldPrice,
-                            x.NewPrice
+                            domainEvent.EventId,
+                            domainEvent.OccurredOnUtc,
+                            candidate.ProductId,
+                            candidate.OldPrice,
+                            candidate.NewPrice
                         ),
                     _ => null,
                 };
-                if (p is null)
+                if (payload is null)
                     continue;
-                var env = new IntegrationEventEnvelope(
-                    e.EventId,
-                    p.GetType().Name,
+                var envelope = new IntegrationEventEnvelope(
+                    domainEvent.EventId,
+                    payload.GetType().Name,
                     1,
-                    e.OccurredOnUtc,
-                    System.Diagnostics.Activity.Current?.TraceId.ToString() ?? e.EventId.ToString(),
+                    domainEvent.OccurredOnUtc,
+                    System.Diagnostics.Activity.Current?.TraceId.ToString()
+                        ?? domainEvent.EventId.ToString(),
                     System.Diagnostics.Activity.Current?.SpanId.ToString(),
                     root.Id.ToString(),
-                    JsonSerializer.Serialize(p, p.GetType())
+                    JsonSerializer.Serialize(payload, payload.GetType())
                 );
                 OutboxMessages.Add(
                     new()
                     {
-                        Id = e.EventId,
+                        Id = domainEvent.EventId,
                         Type = KafkaTopics.CatalogEvents,
                         AggregateId = root.Id.ToString(),
-                        OccurredOnUtc = e.OccurredOnUtc,
-                        Content = JsonSerializer.Serialize(env),
+                        OccurredOnUtc = domainEvent.OccurredOnUtc,
+                        Content = JsonSerializer.Serialize(envelope),
                     }
                 );
             }
             root.ClearDomainEvents();
         }
-        return await base.SaveChangesAsync(ct);
+        return await base.SaveChangesAsync(cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

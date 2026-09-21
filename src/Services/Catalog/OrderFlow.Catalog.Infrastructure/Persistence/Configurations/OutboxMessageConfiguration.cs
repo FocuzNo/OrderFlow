@@ -1,6 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
-
 namespace OrderFlow.Catalog.Infrastructure.Persistence.Configurations;
 
 public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<OutboxMessage>
@@ -8,11 +5,11 @@ public sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outbox
     public void Configure(EntityTypeBuilder<OutboxMessage> builder)
     {
         builder.ToTable("outbox_messages");
-        builder.HasKey(x => x.Id);
-        builder.Property(x => x.Type).HasMaxLength(250);
-        builder.Property(x => x.Content).HasColumnType("jsonb");
-        builder.Property(x => x.AggregateId).HasMaxLength(100);
-        builder.Property(x => x.Error).HasMaxLength(2000);
-        builder.HasIndex(x => new { x.ProcessedOnUtc, x.OccurredOnUtc });
+        builder.HasKey(candidate => candidate.Id);
+        builder.Property(candidate => candidate.Type).HasMaxLength(250);
+        builder.Property(candidate => candidate.Content).HasColumnType("jsonb");
+        builder.Property(candidate => candidate.AggregateId).HasMaxLength(100);
+        builder.Property(candidate => candidate.Error).HasMaxLength(2000);
+        builder.HasIndex(candidate => new { candidate.ProcessedOnUtc, candidate.OccurredOnUtc });
     }
 }

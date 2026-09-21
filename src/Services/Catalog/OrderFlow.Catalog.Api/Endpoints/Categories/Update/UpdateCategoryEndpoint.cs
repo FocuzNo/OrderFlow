@@ -1,5 +1,3 @@
-using FastEndpoints;
-using MediatR;
 using C = OrderFlow.Catalog.Application.Categories.CategoryFeatures;
 using P = OrderFlow.Catalog.Application.Products.ProductFeatures;
 
@@ -7,7 +5,7 @@ namespace OrderFlow.Catalog.Api.Endpoints;
 
 public static partial class CatalogEndpoints
 {
-    public sealed class UpdateCategoryEndpoint(ISender s)
+    public sealed class UpdateCategoryEndpoint(ISender sender)
         : Endpoint<UpdateCategoryRequest, C.CategoryResponse>
     {
         public override void Configure()
@@ -16,10 +14,16 @@ public static partial class CatalogEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(UpdateCategoryRequest r, CancellationToken ct) =>
+        public override async Task HandleAsync(
+            UpdateCategoryRequest request,
+            CancellationToken cancellationToken
+        ) =>
             await Send.OkAsync(
-                await s.Send(new C.UpdateCategoryCommand(r.Id, r.Name, r.Description), ct),
-                ct
+                await sender.Send(
+                    new C.UpdateCategoryCommand(request.Id, request.Name, request.Description),
+                    cancellationToken
+                ),
+                cancellationToken
             );
     }
 }

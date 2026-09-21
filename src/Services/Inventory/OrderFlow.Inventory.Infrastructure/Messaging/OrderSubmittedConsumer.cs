@@ -19,31 +19,32 @@ public sealed class OrderSubmittedConsumer(
     ILogger<OrderSubmittedConsumer> logger
 ) : BackgroundService
 {
-    protected override Task ExecuteAsync(CancellationToken ct) => Task.Run(() => Consume(ct), ct);
+    protected override Task ExecuteAsync(CancellationToken cancellationToken) =>
+        Task.Run(() => Consume(cancellationToken), cancellationToken);
 
-    private async Task Consume(CancellationToken ct)
+    private async Task Consume(CancellationToken cancellationToken)
     {
-        var cfg = new ConsumerConfig
+        var consumerConfiguration = new ConsumerConfig
         {
             BootstrapServers = options.Value.BootstrapServers,
             GroupId = options.Value.ConsumerGroup,
             EnableAutoCommit = false,
             AutoOffsetReset = AutoOffsetReset.Earliest,
         };
-        using var consumer = new ConsumerBuilder<string, string>(cfg).Build();
+        using var consumer = new ConsumerBuilder<string, string>(consumerConfiguration).Build();
         consumer.Subscribe(KafkaTopics.OrderEvents);
         try
         {
-            while (!ct.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
                 ConsumeResult<string, string> result;
                 try
                 {
-                    result = consumer.Consume(ct);
+                    result = consumer.Consume(cancellationToken);
                 }
-                catch (ConsumeException ex)
+                catch (ConsumeException exception)
                 {
-                    logger.LogError(ex, "Inventory Kafka consume error");
+                    logger.LogError(exception, "Inventory Kafka consume error");
                     continue;
                 }
                 var handled = false;
@@ -52,26 +53,32 @@ public sealed class OrderSubmittedConsumer(
                 {
                     try
                     {
-                        handled = await Handle(result.Message.Value, ct);
+                        handled = await Handle(result.Message.Value, cancellationToken);
                     }
-                    catch (Exception ex) when (attempt < max)
+                    catch (Exception exception) when (attempt < max)
                     {
                         logger.LogWarning(
-                            ex,
+                            exception,
                             "Inventory consumer retry {Attempt}/{MaxAttempts}",
                             attempt,
                             max
                         );
-                        await Task.Delay(TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)), ct);
+                        await Task.Delay(
+                            TimeSpan.FromSeconds(Math.Min(attempt * 2, 10)),
+                            cancellationToken
+                        );
                     }
-                    catch (Exception ex)
+                    catch (Exception exception)
                     {
-                        logger.LogError(ex, "Inventory message exhausted retries and moved to DLT");
+                        logger.LogError(
+                            exception,
+                            "Inventory message exhausted retries and moved to DLT"
+                        );
                         await publisher.PublishAsync(
                             KafkaTopics.DeadLetters,
                             result.Message.Key,
                             result.Message.Value,
-                            ct
+                            cancellationToken
                         );
                         handled = true;
                     }
@@ -80,57 +87,61 @@ public sealed class OrderSubmittedConsumer(
                     consumer.Commit(result);
             }
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) { }
         finally
         {
             consumer.Close();
         }
     }
 
-    private async Task<bool> Handle(string content, CancellationToken ct)
+    private async Task<bool> Handle(string content, CancellationToken cancellationToken)
     {
-        var env =
+        var envelope =
             JsonSerializer.Deserialize<IntegrationEventEnvelope>(content)
             ?? throw new JsonException("Envelope is invalid.");
         if (
-            env.EventType != nameof(OrderSubmittedIntegrationEvent)
-            && env.EventType != nameof(OrderCancelledIntegrationEvent)
+            envelope.EventType != nameof(OrderSubmittedIntegrationEvent)
+            && envelope.EventType != nameof(OrderCancelledIntegrationEvent)
         )
             return true;
         await using var scope = scopes.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+        var databaseContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
         if (
-            await db.InboxMessages.AnyAsync(
-                x => x.Id == env.EventId && x.Consumer == options.Value.ConsumerGroup,
-                ct
+            await databaseContext.InboxMessages.AnyAsync(
+                candidate =>
+                    candidate.Id == envelope.EventId
+                    && candidate.Consumer == options.Value.ConsumerGroup,
+                cancellationToken
             )
         )
             return true;
-        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await databaseContext.Database.BeginTransactionAsync(
+            cancellationToken
+        );
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
-        if (env.EventType == nameof(OrderCancelledIntegrationEvent))
+        if (envelope.EventType == nameof(OrderCancelledIntegrationEvent))
         {
             var cancelled = JsonSerializer.Deserialize<OrderCancelledIntegrationEvent>(
-                env.Payload
+                envelope.Payload
             )!;
             await sender.Send(
                 new InventoryFeatures.ReleaseOrderInventoryCommand(cancelled.OrderId),
-                ct
+                cancellationToken
             );
-            db.InboxMessages.Add(
+            databaseContext.InboxMessages.Add(
                 new()
                 {
-                    Id = env.EventId,
+                    Id = envelope.EventId,
                     Consumer = options.Value.ConsumerGroup,
                     ProcessedOnUtc = DateTimeOffset.UtcNow,
                 }
             );
-            await db.SaveChangesAsync(ct);
-            await tx.CommitAsync(ct);
+            await databaseContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
             return true;
         }
         var message =
-            JsonSerializer.Deserialize<OrderSubmittedIntegrationEvent>(env.Payload)
+            JsonSerializer.Deserialize<OrderSubmittedIntegrationEvent>(envelope.Payload)
             ?? throw new JsonException("Order event is invalid.");
         var reservation = await sender.Send(
             new InventoryFeatures.ReserveOrderInventoryCommand(
@@ -142,45 +153,53 @@ public sealed class OrderSubmittedConsumer(
                     ))
                     .ToArray()
             ),
-            ct
+            cancellationToken
         );
+        var outgoingEventId = Guid.NewGuid();
+        var occurredAt = DateTimeOffset.UtcNow;
         object outgoing = reservation.Succeeded
-            ? new InventoryReservedIntegrationEvent(message.OrderId, reservation.ReservationIds)
+            ? new InventoryReservedIntegrationEvent(
+                outgoingEventId,
+                occurredAt,
+                message.OrderId,
+                reservation.ReservationIds
+            )
             : new InventoryReservationFailedIntegrationEvent(
+                outgoingEventId,
+                occurredAt,
                 message.OrderId,
                 reservation.Error ?? "Inventory reservation failed."
             );
-        var outId = Guid.NewGuid();
-        var outEnv = new IntegrationEventEnvelope(
-            outId,
+        var outgoingEnvelope = new IntegrationEventEnvelope(
+            outgoingEventId,
             outgoing.GetType().Name,
             1,
-            DateTimeOffset.UtcNow,
-            env.CorrelationId,
-            env.EventId.ToString(),
+            occurredAt,
+            envelope.CorrelationId,
+            envelope.EventId.ToString(),
             message.OrderId.ToString(),
             JsonSerializer.Serialize(outgoing, outgoing.GetType())
         );
-        db.OutboxMessages.Add(
+        databaseContext.OutboxMessages.Add(
             new()
             {
-                Id = outId,
+                Id = outgoingEventId,
                 Type = KafkaTopics.InventoryEvents,
                 AggregateId = message.OrderId.ToString(),
-                OccurredOnUtc = DateTimeOffset.UtcNow,
-                Content = JsonSerializer.Serialize(outEnv),
+                OccurredOnUtc = occurredAt,
+                Content = JsonSerializer.Serialize(outgoingEnvelope),
             }
         );
-        db.InboxMessages.Add(
+        databaseContext.InboxMessages.Add(
             new()
             {
-                Id = env.EventId,
+                Id = envelope.EventId,
                 Consumer = options.Value.ConsumerGroup,
                 ProcessedOnUtc = DateTimeOffset.UtcNow,
             }
         );
-        await db.SaveChangesAsync(ct);
-        await tx.CommitAsync(ct);
+        await databaseContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return true;
     }
 }

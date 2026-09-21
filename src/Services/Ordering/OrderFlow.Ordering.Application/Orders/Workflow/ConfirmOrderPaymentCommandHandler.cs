@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -8,14 +7,19 @@ namespace OrderFlow.Ordering.Application.Orders;
 
 public static partial class OrderFeatures
 {
-    public sealed class ConfirmOrderPaymentCommandHandler(IOrderRepository r)
-        : IRequestHandler<ConfirmOrderPaymentCommand>
+    public sealed class ConfirmOrderPaymentCommandHandler(
+        IOrderRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ConfirmOrderPaymentCommand>
     {
-        public async Task Handle(ConfirmOrderPaymentCommand c, CancellationToken ct)
+        public async Task Handle(
+            ConfirmOrderPaymentCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.OrderId, ct);
-            x.ConfirmPayment();
-            await r.SaveAsync(ct);
+            var entity = await Find(repository, command.OrderId, cancellationToken);
+            entity.ConfirmPayment();
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 }

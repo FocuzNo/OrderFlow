@@ -7,13 +7,13 @@ public static partial class InventoryFeatures
     {
         public ReserveOrderInventoryCommandValidator()
         {
-            RuleFor(x => x.OrderId).NotEmpty();
-            RuleFor(x => x.Items).NotEmpty();
-            RuleForEach(x => x.Items)
+            RuleFor(candidate => candidate.OrderId).NotEmpty();
+            RuleFor(candidate => candidate.Items).NotEmpty();
+            RuleForEach(candidate => candidate.Items)
                 .ChildRules(item =>
                 {
-                    item.RuleFor(x => x.ProductId).NotEmpty();
-                    item.RuleFor(x => x.Quantity).GreaterThan(0);
+                    item.RuleFor(candidate => candidate.ProductId).NotEmpty();
+                    item.RuleFor(candidate => candidate.Quantity).GreaterThan(0);
                 });
         }
     }

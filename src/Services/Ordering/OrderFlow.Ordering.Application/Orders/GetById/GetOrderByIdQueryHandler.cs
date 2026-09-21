@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -8,10 +7,12 @@ namespace OrderFlow.Ordering.Application.Orders;
 
 public static partial class OrderFeatures
 {
-    public sealed class GetOrderByIdQueryHandler(IOrderRepository r)
+    public sealed class GetOrderByIdQueryHandler(IOrderRepository repository)
         : IRequestHandler<GetOrderByIdQuery, OrderResponse>
     {
-        public async Task<OrderResponse> Handle(GetOrderByIdQuery q, CancellationToken ct) =>
-            Map(await Find(r, q.Id, ct));
+        public async Task<OrderResponse> Handle(
+            GetOrderByIdQuery q,
+            CancellationToken cancellationToken
+        ) => Map(await Find(repository, q.Id, cancellationToken));
     }
 }

@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,16 +8,26 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed class CreatePaymentCommandHandler(IPaymentRepository r)
-        : IRequestHandler<CreatePaymentCommand, PaymentResponse>
+    public sealed class CreatePaymentCommandHandler(
+        IPaymentRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<CreatePaymentCommand, PaymentResponse>
     {
-        public async Task<PaymentResponse> Handle(CreatePaymentCommand c, CancellationToken ct)
+        public async Task<PaymentResponse> Handle(
+            CreatePaymentCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            if (await r.GetByOrderAsync(c.OrderId, ct) is not null)
+            if (await repository.GetByOrderAsync(command.OrderId, cancellationToken) is not null)
                 throw new ConflictException("Payment for order already exists.");
-            var x = Payment.Create(c.OrderId, c.Amount, PaymentMethod.FromName(c.Method, true));
-            await r.AddAsync(x, ct);
-            return Map(x);
+            var entity = Payment.Create(
+                command.OrderId,
+                command.Amount,
+                PaymentMethod.FromName(command.Method, true)
+            );
+            await repository.AddAsync(entity, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

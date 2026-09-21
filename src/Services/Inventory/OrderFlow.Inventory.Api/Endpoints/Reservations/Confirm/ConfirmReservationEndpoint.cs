@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Inventory.Application.Inventory.InventoryFeatures;
 
 namespace OrderFlow.Inventory.Api.Endpoints;
 
 public static partial class InventoryEndpoints
 {
-    public sealed class ConfirmReservationEndpoint(ISender s)
+    public sealed class ConfirmReservationEndpoint(ISender sender)
         : Endpoint<ChangeReservationStateRequest>
     {
         public override void Configure()
@@ -16,15 +14,19 @@ public static partial class InventoryEndpoints
         }
 
         public override async Task HandleAsync(
-            ChangeReservationStateRequest r,
-            CancellationToken ct
+            ChangeReservationStateRequest request,
+            CancellationToken cancellationToken
         )
         {
-            await s.Send(
-                new F.ConfirmReservationCommand(r.ProductId, r.WarehouseId, r.ReservationId),
-                ct
+            await sender.Send(
+                new F.ConfirmReservationCommand(
+                    request.ProductId,
+                    request.WarehouseId,
+                    request.ReservationId
+                ),
+                cancellationToken
             );
-            await Send.NoContentAsync(ct);
+            await Send.NoContentAsync(cancellationToken);
         }
     }
 }

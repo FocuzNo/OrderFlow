@@ -2,7 +2,7 @@ using OrderFlow.Catalog.Domain.Products;
 
 namespace OrderFlow.Catalog.Application.Abstractions.Persistence;
 
-public interface IProductRepository
+public interface IProductRepository : IRepository<Product>
 {
     Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
     Task<IReadOnlyList<Product>> ListAsync(
@@ -13,6 +13,4 @@ public interface IProductRepository
         CancellationToken cancellationToken
     );
     Task<bool> SkuExistsAsync(string sku, Guid? excludingId, CancellationToken cancellationToken);
-    Task AddAsync(Product product, CancellationToken cancellationToken);
-    Task SaveAsync(CancellationToken cancellationToken);
 }

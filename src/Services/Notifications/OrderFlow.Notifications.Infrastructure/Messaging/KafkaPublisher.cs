@@ -19,7 +19,12 @@ public sealed class KafkaPublisher : IKafkaPublisher, IDisposable
             }
         ).Build();
 
-    public async Task PublishAsync(string topic, string key, string content, CancellationToken ct)
+    public async Task PublishAsync(
+        string topic,
+        string key,
+        string content,
+        CancellationToken cancellationToken
+    )
     {
         using var activity = ActivitySource.StartActivity("kafka publish", ActivityKind.Producer);
         activity?.SetTag("messaging.destination.name", topic);
@@ -27,7 +32,7 @@ public sealed class KafkaPublisher : IKafkaPublisher, IDisposable
         await _producer.ProduceAsync(
             topic,
             new Message<string, string> { Key = key, Value = content },
-            ct
+            cancellationToken
         );
     }
 

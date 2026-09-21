@@ -1,27 +1,34 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OrderFlow.Catalog.Domain.Products;
 
 namespace OrderFlow.Catalog.Infrastructure.Persistence.Configurations;
 
 public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
-    public void Configure(EntityTypeBuilder<Product> b)
+    public void Configure(EntityTypeBuilder<Product> builder)
     {
-        b.ToTable("products");
-        b.HasKey(x => x.Id);
-        b.Property(x => x.Sku)
-            .HasConversion(x => x.Value, x => Sku.Create(x))
+        builder.ToTable("products");
+        builder.HasKey(candidate => candidate.Id);
+        builder
+            .Property(candidate => candidate.Sku)
+            .HasConversion(candidate => candidate.Value, candidate => Sku.Create(candidate))
             .HasMaxLength(Sku.MaxLength);
-        b.HasIndex(x => x.Sku).IsUnique();
-        b.Property(x => x.Name).HasMaxLength(Product.MaxNameLength);
-        b.Property(x => x.Description).HasMaxLength(Product.MaxDescriptionLength);
-        b.Property(x => x.Price)
-            .HasConversion(x => x.Amount, x => Money.From(x))
+        builder.HasIndex(candidate => candidate.Sku).IsUnique();
+        builder.Property(candidate => candidate.Name).HasMaxLength(Product.MaxNameLength);
+        builder
+            .Property(candidate => candidate.Description)
+            .HasMaxLength(Product.MaxDescriptionLength);
+        builder
+            .Property(candidate => candidate.Price)
+            .HasConversion(candidate => candidate.Amount, candidate => Money.From(candidate))
             .HasPrecision(18, 2);
-        b.Property(x => x.Status).HasConversion(x => x.Value, x => ProductStatus.FromValue(x));
-        b.HasIndex(x => x.CategoryId);
-        b.Ignore(x => x.DomainEvents);
-        b.Property(x => x.Version).IsRowVersion();
+        builder
+            .Property(candidate => candidate.Status)
+            .HasConversion(
+                candidate => candidate.Value,
+                candidate => ProductStatus.FromValue(candidate)
+            );
+        builder.HasIndex(candidate => candidate.CategoryId);
+        builder.Ignore(candidate => candidate.DomainEvents);
+        builder.Property(candidate => candidate.Version).IsRowVersion();
     }
 }

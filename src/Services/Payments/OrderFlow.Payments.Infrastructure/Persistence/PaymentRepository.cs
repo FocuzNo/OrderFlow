@@ -1,25 +1,21 @@
-using Microsoft.EntityFrameworkCore;
 using OrderFlow.Payments.Application.Abstractions.Persistence;
 using OrderFlow.Payments.Domain.Payments;
+using OrderFlow.Payments.Infrastructure.Persistence.Repositories;
 
 namespace OrderFlow.Payments.Infrastructure.Persistence;
 
-public sealed class PaymentRepository(PaymentsDbContext db) : IPaymentRepository
+public sealed class PaymentRepository(PaymentsDbContext databaseContext)
+    : Repository<Payment>(databaseContext),
+        IPaymentRepository
 {
-    public Task<Payment?> GetAsync(Guid id, CancellationToken ct) =>
-        db.Payments.Include(x => x.Refunds).SingleOrDefaultAsync(x => x.Id == id, ct);
+    public Task<Payment?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        DatabaseContext
+            .Payments.Include(candidate => candidate.Refunds)
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
-    public Task<Payment?> GetByOrderAsync(Guid id, CancellationToken ct) =>
-        db
+    public Task<Payment?> GetByOrderAsync(Guid id, CancellationToken cancellationToken) =>
+        DatabaseContext
             .Payments.AsNoTracking()
-            .Include(x => x.Refunds)
-            .SingleOrDefaultAsync(x => x.OrderId == id, ct);
-
-    public async Task AddAsync(Payment x, CancellationToken ct)
-    {
-        db.Payments.Add(x);
-        await db.SaveChangesAsync(ct);
-    }
-
-    public async Task SaveAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
+            .Include(candidate => candidate.Refunds)
+            .SingleOrDefaultAsync(candidate => candidate.OrderId == id, cancellationToken);
 }

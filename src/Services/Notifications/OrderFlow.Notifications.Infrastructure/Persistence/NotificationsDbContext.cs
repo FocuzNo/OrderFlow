@@ -1,13 +1,15 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using OrderFlow.IntegrationContracts;
+using OrderFlow.Notifications.Application.Abstractions.Persistence;
 using OrderFlow.Notifications.Domain.Common;
 using OrderFlow.Notifications.Domain.Notifications;
 
 namespace OrderFlow.Notifications.Infrastructure.Persistence;
 
-public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> o)
-    : DbContext(o)
+public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbContext> options)
+    : DbContext(options),
+        IUnitOfWork
 {
     public DbSet<Notification> Notifications => Set<Notification>();
 
@@ -17,33 +19,36 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
 
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
-    public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         var roots = ChangeTracker
             .Entries<AggregateRoot>()
-            .Select(x => x.Entity)
-            .Where(x => x.DomainEvents.Count > 0)
+            .Select(candidate => candidate.Entity)
+            .Where(candidate => candidate.DomainEvents.Count > 0)
             .ToArray();
         foreach (var root in roots)
         {
-            foreach (var e in root.DomainEvents)
+            foreach (var domainEvent in root.DomainEvents)
             {
-                object? payload = e switch
+                object? payload = domainEvent switch
                 {
-                    NotificationSentDomainEvent x => new NotificationSentIntegrationEvent(
-                        x.NotificationId,
-                        x.Recipient
+                    NotificationSentDomainEvent candidate => new NotificationSentIntegrationEvent(
+                        domainEvent.EventId,
+                        domainEvent.OccurredOnUtc,
+                        candidate.NotificationId,
+                        candidate.Recipient
                     ),
                     _ => null,
                 };
                 if (payload is null)
                     continue;
-                var env = new IntegrationEventEnvelope(
-                    e.EventId,
+                var envelope = new IntegrationEventEnvelope(
+                    domainEvent.EventId,
                     payload.GetType().Name,
                     1,
-                    e.OccurredOnUtc,
-                    System.Diagnostics.Activity.Current?.TraceId.ToString() ?? e.EventId.ToString(),
+                    domainEvent.OccurredOnUtc,
+                    System.Diagnostics.Activity.Current?.TraceId.ToString()
+                        ?? domainEvent.EventId.ToString(),
                     System.Diagnostics.Activity.Current?.SpanId.ToString(),
                     root.Id.ToString(),
                     JsonSerializer.Serialize(payload, payload.GetType())
@@ -51,17 +56,17 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
                 OutboxMessages.Add(
                     new()
                     {
-                        Id = e.EventId,
+                        Id = domainEvent.EventId,
                         Type = KafkaTopics.NotificationEvents,
                         AggregateId = root.Id.ToString(),
-                        OccurredOnUtc = e.OccurredOnUtc,
-                        Content = JsonSerializer.Serialize(env),
+                        OccurredOnUtc = domainEvent.OccurredOnUtc,
+                        Content = JsonSerializer.Serialize(envelope),
                     }
                 );
             }
             root.ClearDomainEvents();
         }
-        return await base.SaveChangesAsync(ct);
+        return await base.SaveChangesAsync(cancellationToken);
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>

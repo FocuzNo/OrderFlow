@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Payments.Application.Payments.PaymentFeatures;
 
 namespace OrderFlow.Payments.Api.Endpoints;
 
 public static partial class PaymentEndpoints
 {
-    public sealed class MarkPaymentSucceededEndpoint(ISender s)
+    public sealed class MarkPaymentSucceededEndpoint(ISender sender)
         : Endpoint<MarkPaymentSucceededRequest>
     {
         public override void Configure()
@@ -15,10 +13,16 @@ public static partial class PaymentEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(MarkPaymentSucceededRequest r, CancellationToken ct)
+        public override async Task HandleAsync(
+            MarkPaymentSucceededRequest request,
+            CancellationToken cancellationToken
+        )
         {
-            await s.Send(new F.MarkPaymentSucceededCommand(r.Id, r.Reference), ct);
-            await Send.NoContentAsync(ct);
+            await sender.Send(
+                new F.MarkPaymentSucceededCommand(request.Id, request.Reference),
+                cancellationToken
+            );
+            await Send.NoContentAsync(cancellationToken);
         }
     }
 }

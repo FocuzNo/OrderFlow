@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Ordering.Application.Orders.OrderFeatures;
 
 namespace OrderFlow.Ordering.Api.Endpoints;
 
 public static partial class OrderEndpoints
 {
-    public sealed class AddOrderItemEndpoint(ISender s)
+    public sealed class AddOrderItemEndpoint(ISender sender)
         : Endpoint<AddOrderItemRequest, F.OrderResponse>
     {
         public override void Configure()
@@ -15,19 +13,22 @@ public static partial class OrderEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(AddOrderItemRequest r, CancellationToken ct) =>
+        public override async Task HandleAsync(
+            AddOrderItemRequest request,
+            CancellationToken cancellationToken
+        ) =>
             await Send.OkAsync(
-                await s.Send(
+                await sender.Send(
                     new F.AddOrderItemCommand(
-                        r.Id,
-                        r.ProductId,
-                        r.ProductName,
-                        r.UnitPrice,
-                        r.Quantity
+                        request.Id,
+                        request.ProductId,
+                        request.ProductName,
+                        request.UnitPrice,
+                        request.Quantity
                     ),
-                    ct
+                    cancellationToken
                 ),
-                ct
+                cancellationToken
             );
     }
 }

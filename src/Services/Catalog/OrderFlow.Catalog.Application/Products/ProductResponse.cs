@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -21,17 +19,17 @@ public static partial class ProductFeatures
         DateTimeOffset UpdatedAt
     )
     {
-        public static ProductResponse From(Product x) =>
+        public static ProductResponse From(Product candidate) =>
             new(
-                x.Id,
-                x.Sku.Value,
-                x.Name,
-                x.Description,
-                x.Price.Amount,
-                x.CategoryId,
-                x.Status.Name,
-                x.CreatedAt,
-                x.UpdatedAt
+                candidate.Id,
+                candidate.Sku.Value,
+                candidate.Name,
+                candidate.Description,
+                candidate.Price.Amount,
+                candidate.CategoryId,
+                candidate.Status.Name,
+                candidate.CreatedAt,
+                candidate.UpdatedAt
             );
     }
 }

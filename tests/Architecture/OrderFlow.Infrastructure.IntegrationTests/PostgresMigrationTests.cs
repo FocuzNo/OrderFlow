@@ -83,11 +83,11 @@ public sealed class PostgresMigrationTests
         await using var first = new InventoryContext(options);
         await using var second = new InventoryContext(options);
         var firstStock = await first
-            .StockItems.Include(x => x.Reservations)
-            .SingleAsync(x => x.Id == stockId);
+            .StockItems.Include(candidate => candidate.Reservations)
+            .SingleAsync(candidate => candidate.Id == stockId);
         var secondStock = await second
-            .StockItems.Include(x => x.Reservations)
-            .SingleAsync(x => x.Id == stockId);
+            .StockItems.Include(candidate => candidate.Reservations)
+            .SingleAsync(candidate => candidate.Id == stockId);
         firstStock.Reserve(Guid.NewGuid(), 4);
         secondStock.Reserve(Guid.NewGuid(), 4);
         await first.SaveChangesAsync();
@@ -129,8 +129,8 @@ public sealed class PostgresMigrationTests
             .UseNpgsql(postgres.GetConnectionString())
             .UseSnakeCaseNamingConvention()
             .Options;
-        await using var db = new OrderingContext(options);
-        await db.Database.MigrateAsync();
+        await using var databaseContext = new OrderingContext(options);
+        await databaseContext.Database.MigrateAsync();
         var order = OrderingAggregate.Create(
             Guid.NewGuid(),
             "buyer@example.test",
@@ -138,12 +138,28 @@ public sealed class PostgresMigrationTests
         );
         order.AddItem(Guid.NewGuid(), "Notebook", 12.50m, 2);
         order.Submit();
-        db.Orders.Add(order);
+        var repository = new OrderFlow.Ordering.Infrastructure.Persistence.OrderRepository(
+            databaseContext
+        );
+        await repository.AddAsync(order, default);
 
-        await db.SaveChangesAsync();
+        OrderFlow.Ordering.Application.Abstractions.Persistence.IUnitOfWork unitOfWork =
+            databaseContext;
+        await unitOfWork.SaveChangesAsync();
 
-        Assert.Equal(1, await db.Orders.CountAsync());
-        Assert.Equal(1, await db.OutboxMessages.CountAsync());
+        Assert.Equal(1, await databaseContext.Orders.CountAsync());
+        Assert.Equal(1, await databaseContext.OutboxMessages.CountAsync());
+        var outboxMessage = await databaseContext.OutboxMessages.SingleAsync();
+        var envelope =
+            System.Text.Json.JsonSerializer.Deserialize<OrderFlow.IntegrationContracts.IntegrationEventEnvelope>(
+                outboxMessage.Content
+            )!;
+        var integrationEvent =
+            System.Text.Json.JsonSerializer.Deserialize<OrderFlow.IntegrationContracts.OrderSubmittedIntegrationEvent>(
+                envelope.Payload
+            )!;
+        Assert.Equal(envelope.EventId, integrationEvent.EventId);
+        Assert.Equal(envelope.OccurredOnUtc, integrationEvent.OccurredAt);
     }
 
     private static async Task Apply<TContext>(

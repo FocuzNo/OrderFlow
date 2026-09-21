@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Payments.Application.Payments;
 
 public sealed class RefundPaymentCommandValidator
@@ -7,7 +5,7 @@ public sealed class RefundPaymentCommandValidator
 {
     public RefundPaymentCommandValidator()
     {
-        RuleFor(x => x.Amount).GreaterThan(0);
-        RuleFor(x => x.Reason).NotEmpty().MaximumLength(1000);
+        RuleFor(candidate => candidate.Amount).GreaterThan(0);
+        RuleFor(candidate => candidate.Reason).NotEmpty().MaximumLength(1000);
     }
 }

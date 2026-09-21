@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -9,18 +8,25 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class ReserveInventoryCommandHandler(IInventoryRepository r)
-        : IRequestHandler<ReserveInventoryCommand, ReservationResponse>
+    public sealed class ReserveInventoryCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ReserveInventoryCommand, ReservationResponse>
     {
         public async Task<ReservationResponse> Handle(
-            ReserveInventoryCommand c,
-            CancellationToken ct
+            ReserveInventoryCommand command,
+            CancellationToken cancellationToken
         )
         {
-            var x = await Find(r, c.ProductId, c.WarehouseId, ct);
-            var z = x.Reserve(c.OrderId, c.Quantity);
-            await r.SaveAsync(ct);
-            return Map(z);
+            var entity = await Find(
+                repository,
+                command.ProductId,
+                command.WarehouseId,
+                cancellationToken
+            );
+            var reservation = entity.Reserve(command.OrderId, command.Quantity);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(reservation);
         }
     }
 }

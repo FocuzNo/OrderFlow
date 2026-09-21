@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;
@@ -9,22 +8,25 @@ namespace OrderFlow.Notifications.Application.Notifications;
 
 public static partial class NotificationFeatures
 {
-    public sealed class CreateNotificationCommandHandler(INotificationRepository r)
-        : IRequestHandler<CreateNotificationCommand, NotificationResponse>
+    public sealed class CreateNotificationCommandHandler(
+        INotificationRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<CreateNotificationCommand, NotificationResponse>
     {
         public async Task<NotificationResponse> Handle(
-            CreateNotificationCommand c,
-            CancellationToken ct
+            CreateNotificationCommand command,
+            CancellationToken cancellationToken
         )
         {
-            var x = Notification.Create(
-                c.Recipient,
-                c.Subject,
-                c.Body,
-                NotificationChannel.FromName(c.Channel, true)
+            var entity = Notification.Create(
+                command.Recipient,
+                command.Subject,
+                command.Body,
+                NotificationChannel.FromName(command.Channel, true)
             );
-            await r.AddAsync(x, ct);
-            return Map(x);
+            await repository.AddAsync(entity, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }
