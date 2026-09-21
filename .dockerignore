@@ -1,0 +1,10 @@
+**/bin
+**/obj
+.git
+.vs
+.idea
+work
+TestResults
+.env
+*.user
+*.suo
