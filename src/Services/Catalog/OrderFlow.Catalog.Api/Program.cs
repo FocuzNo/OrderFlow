@@ -15,6 +15,8 @@ builder.Services.AddSerilog((services, configuration) => configuration
 
 builder.Services.AddApplication().AddInfrastructure(builder.Configuration);
 builder.Services.AddFastEndpoints();
+builder.Services.AddOpenApi();
+builder.Services.AddHealthChecks().AddDbContextCheck<OrderFlow.Catalog.Infrastructure.Persistence.CatalogDbContext>();
 builder.Services.AddExceptionHandler<ValidationExceptionHandler>();
 builder.Services.AddProblemDetails();
 
@@ -23,5 +25,7 @@ var app = builder.Build();
 app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseFastEndpoints();
+app.MapOpenApi();
+app.MapHealthChecks("/health");
 
 app.Run();

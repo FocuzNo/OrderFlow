@@ -9,6 +9,7 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
     public void Configure(EntityTypeBuilder<Product> builder)
     {
         builder.ToTable("products");
+        builder.Ignore(product => product.DomainEvents);
 
         builder.HasKey(product => product.Id);
 

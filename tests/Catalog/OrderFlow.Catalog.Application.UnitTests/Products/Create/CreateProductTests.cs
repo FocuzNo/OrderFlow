@@ -89,5 +89,14 @@ public sealed class CreateProductTests
 
             return Task.CompletedTask;
         }
+
+        public Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+            Task.FromResult(AddedProduct?.Id == id ? AddedProduct : null);
+
+        public Task<IReadOnlyList<Product>> ListAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Product>>(AddedProduct is null ? [] : [AddedProduct]);
+
+        public Task UpdateAsync(Product product, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task DeleteAsync(Product product, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

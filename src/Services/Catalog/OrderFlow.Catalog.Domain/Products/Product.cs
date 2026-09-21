@@ -1,7 +1,10 @@
+using OrderFlow.Catalog.Domain;
+
 namespace OrderFlow.Catalog.Domain.Products;
 
-public sealed class Product
+public sealed class Product : IHasDomainEvents
 {
+    private readonly List<DomainEvent> _domainEvents = [];
     public const int MaxNameLength = 200;
     public const int MaxDescriptionLength = 2_000;
 
@@ -11,6 +14,7 @@ public sealed class Product
     public decimal Price { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
+    public IReadOnlyCollection<DomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
     private Product(
         Guid id,
@@ -36,18 +40,26 @@ public sealed class Product
     {
         Validate(name, description, price);
 
-        return new Product(Guid.NewGuid(), name, description, price, DateTimeOffset.UtcNow);
+        var product = new Product(Guid.NewGuid(), name.Trim(), description?.Trim(), price, DateTimeOffset.UtcNow);
+        product._domainEvents.Add(new DomainEvent(Guid.NewGuid(), "catalog.product-created", product.Id, product.CreatedAt));
+        return product;
     }
 
     public void Update(string name, string? description, decimal price)
     {
         Validate(name, description, price);
 
-        Name = name;
-        Description = description;
+        Name = name.Trim();
+        Description = description?.Trim();
         Price = price;
         UpdatedAt = DateTimeOffset.UtcNow;
+        _domainEvents.Add(new DomainEvent(Guid.NewGuid(), "catalog.product-updated", Id, UpdatedAt));
     }
+
+    public void MarkDeleted() =>
+        _domainEvents.Add(new DomainEvent(Guid.NewGuid(), "catalog.product-deleted", Id, DateTimeOffset.UtcNow));
+
+    public void ClearDomainEvents() => _domainEvents.Clear();
 
     private static void Validate(string name, string? description, decimal price)
     {
