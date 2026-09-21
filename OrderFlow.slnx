@@ -5,4 +5,8 @@
     <Project Path="src/Services/Catalog/OrderFlow.Catalog.Domain/OrderFlow.Catalog.Domain.csproj" />
     <Project Path="src/Services/Catalog/OrderFlow.Catalog.Infrastructure/OrderFlow.Catalog.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/Catalog/Tests/">
+    <Project Path="tests/Catalog/OrderFlow.Catalog.Application.UnitTests/OrderFlow.Catalog.Application.UnitTests.csproj" />
+    <Project Path="tests/Catalog/OrderFlow.Catalog.Domain.UnitTests/OrderFlow.Catalog.Domain.UnitTests.csproj" />
+  </Folder>
 </Solution>
