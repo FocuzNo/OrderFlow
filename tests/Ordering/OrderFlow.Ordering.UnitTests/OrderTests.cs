@@ -1,24 +1,30 @@
-using OrderFlow.Ordering.Application;
-using OrderFlow.Ordering.Domain;
+using OrderFlow.Ordering.Domain.Common;
+using OrderFlow.Ordering.Domain.Orders;
 
 namespace OrderFlow.Ordering.UnitTests;
 
 public sealed class OrderTests
 {
-    [Fact] public void Create_enforces_value_invariant() => Assert.Throws<ArgumentOutOfRangeException>(() => Order.Create("customer", null, -1));
-    [Fact] public async Task Handler_creates_and_persists_order()
+    private static Order CreateOrder() => Order.Create(Guid.NewGuid(), "buyer@example.test", ShippingAddress.Create("1 Main St", "Minsk", "220000", "BY"));
+
+    [Fact]
+    public void Submit_moves_order_to_inventory_and_raises_event()
     {
-        var repository = new Repository();
-        var result = await new CreateHandler(repository).Handle(new CreateOrderCommand("customer", "notes", 42), default);
-        Assert.Equal(result.Id, repository.Entity?.Id); Assert.Equal("Pending", result.Status); Assert.Contains(repository.Entity!.DomainEvents, x => x.Type == "ordering.order-created");
+        var order = CreateOrder();
+        order.AddItem(Guid.NewGuid(), "Notebook", 12.50m, 2);
+        order.Submit();
+
+        Assert.Equal(OrderStatus.PendingInventory, order.Status);
+        Assert.Equal(25m, order.TotalAmount);
+        Assert.Contains(order.DomainEvents, x => x is OrderSubmittedDomainEvent);
     }
-    private sealed class Repository : IOrderRepository
+
+    [Fact]
+    public void Submitted_order_cannot_be_edited()
     {
-        public Order? Entity { get; private set; }
-        public Task AddAsync(Order entity, CancellationToken ct) { Entity = entity; return Task.CompletedTask; }
-        public Task<Order?> GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Entity);
-        public Task<IReadOnlyList<Order>> ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Order>>(Entity is null ? [] : [Entity]);
-        public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
-        public Task DeleteAsync(Order entity, CancellationToken ct) => Task.CompletedTask;
+        var order = CreateOrder();
+        order.AddItem(Guid.NewGuid(), "Notebook", 10m, 1);
+        order.Submit();
+        Assert.Throws<DomainException>(() => order.AddItem(Guid.NewGuid(), "Pen", 2m, 1));
     }
 }

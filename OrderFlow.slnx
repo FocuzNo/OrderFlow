@@ -1,4 +1,10 @@
 <Solution>
+  <Folder Name="/BuildingBlocks/">
+    <Project Path="src/BuildingBlocks/OrderFlow.IntegrationContracts/OrderFlow.IntegrationContracts.csproj" />
+  </Folder>
+  <Folder Name="/Architecture/Tests/">
+    <Project Path="tests/Architecture/OrderFlow.Infrastructure.IntegrationTests/OrderFlow.Infrastructure.IntegrationTests.csproj" />
+  </Folder>
   <Folder Name="/Catalog/">
     <Project Path="src/Services/Catalog/OrderFlow.Catalog.Api/OrderFlow.Catalog.Api.csproj" />
     <Project Path="src/Services/Catalog/OrderFlow.Catalog.Application/OrderFlow.Catalog.Application.csproj" />

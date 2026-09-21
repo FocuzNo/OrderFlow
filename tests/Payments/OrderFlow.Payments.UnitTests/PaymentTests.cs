@@ -1,24 +1,23 @@
-using OrderFlow.Payments.Application;
-using OrderFlow.Payments.Domain;
+using OrderFlow.Payments.Domain.Common;
+using OrderFlow.Payments.Domain.Payments;
 
 namespace OrderFlow.Payments.UnitTests;
 
 public sealed class PaymentTests
 {
-    [Fact] public void Create_rejects_negative_amount() => Assert.Throws<ArgumentOutOfRangeException>(() => Payment.Create("order", null, -0.01m));
-    [Fact] public async Task Handler_creates_and_persists_payment()
+    [Fact]
+    public void Successful_payment_can_be_fully_refunded()
     {
-        var repository = new Repository();
-        var result = await new CreateHandler(repository).Handle(new CreatePaymentCommand("order-1", "provider", 99), default);
-        Assert.Equal(result.Id, repository.Entity?.Id); Assert.Equal(99, result.Value); Assert.NotEmpty(repository.Entity!.DomainEvents);
+        var payment = Payment.Create(Guid.NewGuid(), 99m, PaymentMethod.Card);
+        payment.StartProcessing();
+        payment.Succeed("provider-1");
+        payment.Refund(99m, "Customer request");
+
+        Assert.Equal(PaymentStatus.Refunded, payment.Status);
+        Assert.Single(payment.Refunds);
     }
-    private sealed class Repository : IPaymentRepository
-    {
-        public Payment? Entity { get; private set; }
-        public Task AddAsync(Payment entity, CancellationToken ct) { Entity = entity; return Task.CompletedTask; }
-        public Task<Payment?> GetAsync(Guid id, CancellationToken ct) => Task.FromResult(Entity);
-        public Task<IReadOnlyList<Payment>> ListAsync(CancellationToken ct) => Task.FromResult<IReadOnlyList<Payment>>(Entity is null ? [] : [Entity]);
-        public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
-        public Task DeleteAsync(Payment entity, CancellationToken ct) => Task.CompletedTask;
-    }
+
+    [Fact]
+    public void Payment_requires_positive_amount() =>
+        Assert.Throws<DomainException>(() => Payment.Create(Guid.NewGuid(), 0, PaymentMethod.Card));
 }
