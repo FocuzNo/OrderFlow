@@ -10,6 +10,11 @@ public interface IInventoryRepository
     Task<IReadOnlyList<Warehouse>> ListWarehousesAsync(CancellationToken ct);
     Task AddStockItemAsync(StockItem item, CancellationToken ct);
     Task<StockItem?> GetStockAsync(Guid productId, Guid warehouseId, CancellationToken ct);
+    Task<StockItem?> GetBestAvailableStockAsync(Guid productId, CancellationToken ct);
+    Task<IReadOnlyList<StockItem>> GetStockItemsWithPendingReservationsAsync(
+        Guid orderId,
+        CancellationToken ct
+    );
     Task<StockReservation?> GetReservationAsync(Guid id, CancellationToken ct);
     Task SaveAsync(CancellationToken ct);
 }

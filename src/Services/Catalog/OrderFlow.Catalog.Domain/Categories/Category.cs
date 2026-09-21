@@ -5,6 +5,7 @@ namespace OrderFlow.Catalog.Domain.Categories;
 public sealed class Category : Entity
 {
     public const int MaxNameLength = 120;
+    public const int MaxDescriptionLength = 1000;
 
     private Category() { }
 
@@ -16,6 +17,7 @@ public sealed class Category : Entity
     }
 
     public string Name { get; private set; } = string.Empty;
+
     public string? Description { get; private set; }
 
     public static Category Create(string name, string? description)
@@ -35,7 +37,7 @@ public sealed class Category : Entity
     {
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > MaxNameLength)
             throw new DomainException("Category name must contain 1-120 characters.");
-        if (description?.Length > 1000)
+        if (description?.Length > MaxDescriptionLength)
             throw new DomainException("Category description cannot exceed 1000 characters.");
     }
 }

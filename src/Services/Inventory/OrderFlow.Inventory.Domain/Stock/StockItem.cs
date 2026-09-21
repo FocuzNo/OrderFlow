@@ -18,12 +18,19 @@ public sealed class StockItem : AggregateRoot
     }
 
     public Guid ProductId { get; private set; }
+
     public Guid WarehouseId { get; private set; }
+
     public string Sku { get; private set; } = string.Empty;
+
     public int QuantityOnHand { get; private set; }
+
     public int ReservedQuantity { get; private set; }
+
     public int AvailableQuantity => QuantityOnHand - ReservedQuantity;
+
     public uint Version { get; private set; }
+
     public IReadOnlyCollection<StockReservation> Reservations => _reservations.AsReadOnly();
 
     public static StockItem Create(Guid productId, Guid warehouseId, string sku)

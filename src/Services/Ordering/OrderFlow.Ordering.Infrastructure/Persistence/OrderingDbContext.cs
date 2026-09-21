@@ -10,8 +10,11 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
     : DbContext(options)
 {
     public DbSet<Order> Orders => Set<Order>();
+
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
@@ -84,65 +87,6 @@ public sealed class OrderingDbContext(DbContextOptions<OrderingDbContext> option
         return await base.SaveChangesAsync(ct);
     }
 
-    protected override void OnModelCreating(ModelBuilder m)
-    {
-        m.Entity<Order>(b =>
-        {
-            b.ToTable("orders");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.CustomerEmail)
-                .HasConversion(x => x.Value, x => EmailAddress.Create(x))
-                .HasMaxLength(320);
-            b.Property(x => x.Status).HasConversion(x => x.Value, x => OrderStatus.FromValue(x));
-            b.Ignore(x => x.DomainEvents);
-            b.Ignore(x => x.TotalAmount);
-            b.OwnsOne(
-                x => x.ShippingAddress,
-                a =>
-                {
-                    a.Property(x => x.Line1).HasColumnName("shipping_line1").HasMaxLength(300);
-                    a.Property(x => x.City).HasColumnName("shipping_city").HasMaxLength(120);
-                    a.Property(x => x.PostalCode)
-                        .HasColumnName("shipping_postal_code")
-                        .HasMaxLength(30);
-                    a.Property(x => x.Country).HasColumnName("shipping_country").HasMaxLength(100);
-                }
-            );
-            b.HasMany(x => x.Items)
-                .WithOne()
-                .HasForeignKey("OrderId")
-                .OnDelete(DeleteBehavior.Cascade);
-            b.HasIndex(x => new { x.CustomerId, x.CreatedAt });
-            b.Property(x => x.Version).IsRowVersion();
-        });
-        m.Entity<OrderItem>(b =>
-        {
-            b.ToTable("order_items");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.ProductName).HasMaxLength(200);
-            b.Property(x => x.UnitPrice).HasPrecision(18, 2);
-            b.Ignore(x => x.Total);
-        });
-        ConfigureMessaging(m);
-    }
-
-    private static void ConfigureMessaging(ModelBuilder m)
-    {
-        m.Entity<OutboxMessage>(b =>
-        {
-            b.ToTable("outbox_messages");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Type).HasMaxLength(250);
-            b.Property(x => x.Content).HasColumnType("jsonb");
-            b.Property(x => x.AggregateId).HasMaxLength(100);
-            b.Property(x => x.Error).HasMaxLength(2000);
-            b.HasIndex(x => new { x.ProcessedOnUtc, x.OccurredOnUtc });
-        });
-        m.Entity<InboxMessage>(b =>
-        {
-            b.ToTable("inbox_messages");
-            b.HasKey(x => new { x.Id, x.Consumer });
-            b.Property(x => x.Consumer).HasMaxLength(200);
-        });
-    }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(OrderingDbContext).Assembly);
 }

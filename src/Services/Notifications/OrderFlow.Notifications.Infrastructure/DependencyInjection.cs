@@ -11,24 +11,41 @@ namespace OrderFlow.Notifications.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection s, IConfiguration c)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        var cs =
-            c.GetConnectionString("NotificationsDatabase")
+        var connectionString =
+            configuration.GetConnectionString("NotificationsDatabase")
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:NotificationsDatabase is required."
             );
-        _ =
-            c[$"{KafkaOptions.SectionName}:BootstrapServers"]
-            ?? throw new InvalidOperationException("Kafka:BootstrapServers is required.");
-        s.Configure<KafkaOptions>(c.GetSection(KafkaOptions.SectionName));
-        s.AddDbContext<NotificationsDbContext>(x => x.UseNpgsql(cs).UseSnakeCaseNamingConvention());
-        s.AddScoped<INotificationRepository, NotificationRepository>();
-        s.AddSingleton<IEmailSender, LoggingEmailSender>();
-        s.AddSingleton<IKafkaPublisher, KafkaPublisher>();
-        s.AddHostedService<OutboxProcessor>();
-        s.AddHostedService<OrderOutcomeConsumer>();
-        s.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
-        return s;
+
+        services
+            .AddOptions<KafkaOptions>()
+            .Bind(configuration.GetSection(KafkaOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.BootstrapServers),
+                "Kafka:BootstrapServers is required."
+            )
+            .Validate(options => options.MaxRetries > 0, "Kafka:MaxRetries must be positive.")
+            .Validate(
+                options => options.OutboxBatchSize > 0,
+                "Kafka:OutboxBatchSize must be positive."
+            )
+            .ValidateOnStart();
+
+        services.AddDbContext<NotificationsDbContext>(options =>
+            options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
+        );
+        services.AddScoped<INotificationRepository, NotificationRepository>();
+        services.AddSingleton<IEmailSender, LoggingEmailSender>();
+        services.AddSingleton<IKafkaPublisher, KafkaPublisher>();
+        services.AddHostedService<OutboxProcessor>();
+        services.AddHostedService<OrderOutcomeConsumer>();
+        services.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
+
+        return services;
     }
 }

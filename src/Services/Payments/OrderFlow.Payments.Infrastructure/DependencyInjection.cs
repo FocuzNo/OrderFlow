@@ -11,27 +11,44 @@ namespace OrderFlow.Payments.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection s, IConfiguration c)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        var cs =
-            c.GetConnectionString("PaymentsDatabase")
+        var connectionString =
+            configuration.GetConnectionString("PaymentsDatabase")
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:PaymentsDatabase is required."
             );
-        _ =
-            c[$"{KafkaOptions.SectionName}:BootstrapServers"]
-            ?? throw new InvalidOperationException("Kafka:BootstrapServers is required.");
-        s.Configure<KafkaOptions>(c.GetSection(KafkaOptions.SectionName));
-        s.Configure<DevelopmentPaymentGatewayOptions>(
-            c.GetSection(DevelopmentPaymentGatewayOptions.SectionName)
+
+        services
+            .AddOptions<KafkaOptions>()
+            .Bind(configuration.GetSection(KafkaOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.BootstrapServers),
+                "Kafka:BootstrapServers is required."
+            )
+            .Validate(options => options.MaxRetries > 0, "Kafka:MaxRetries must be positive.")
+            .Validate(
+                options => options.OutboxBatchSize > 0,
+                "Kafka:OutboxBatchSize must be positive."
+            )
+            .ValidateOnStart();
+
+        services.Configure<DevelopmentPaymentGatewayOptions>(
+            configuration.GetSection(DevelopmentPaymentGatewayOptions.SectionName)
         );
-        s.AddDbContext<PaymentsDbContext>(x => x.UseNpgsql(cs).UseSnakeCaseNamingConvention());
-        s.AddScoped<IPaymentRepository, PaymentRepository>();
-        s.AddSingleton<IPaymentGateway, DevelopmentPaymentGateway>();
-        s.AddSingleton<IKafkaPublisher, KafkaPublisher>();
-        s.AddHostedService<OutboxProcessor>();
-        s.AddHostedService<PaymentRequestedConsumer>();
-        s.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
-        return s;
+        services.AddDbContext<PaymentsDbContext>(options =>
+            options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
+        );
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
+        services.AddSingleton<IPaymentGateway, DevelopmentPaymentGateway>();
+        services.AddSingleton<IKafkaPublisher, KafkaPublisher>();
+        services.AddHostedService<OutboxProcessor>();
+        services.AddHostedService<PaymentRequestedConsumer>();
+        services.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
+
+        return services;
     }
 }

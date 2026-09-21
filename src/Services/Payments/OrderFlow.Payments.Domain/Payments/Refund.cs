@@ -15,7 +15,9 @@ public sealed class Refund : Entity
     }
 
     public decimal Amount { get; private set; }
+
     public string Reason { get; private set; } = string.Empty;
+
     public DateTimeOffset CreatedAt { get; private set; }
 
     public static Refund Create(decimal amount, string reason)

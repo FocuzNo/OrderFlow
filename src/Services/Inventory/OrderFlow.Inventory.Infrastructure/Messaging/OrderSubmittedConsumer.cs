@@ -1,11 +1,13 @@
 using System.Text.Json;
 using Confluent.Kafka;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OrderFlow.IntegrationContracts;
+using OrderFlow.Inventory.Application.Inventory;
 using OrderFlow.Inventory.Infrastructure.Persistence;
 
 namespace OrderFlow.Inventory.Infrastructure.Messaging;
@@ -105,34 +107,16 @@ public sealed class OrderSubmittedConsumer(
         )
             return true;
         await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         if (env.EventType == nameof(OrderCancelledIntegrationEvent))
         {
             var cancelled = JsonSerializer.Deserialize<OrderCancelledIntegrationEvent>(
                 env.Payload
             )!;
-            var stocks = await db
-                .StockItems.Include(x => x.Reservations)
-                .Where(x =>
-                    x.Reservations.Any(r =>
-                        r.OrderId == cancelled.OrderId
-                        && r.Status
-                            == OrderFlow.Inventory.Domain.Reservations.ReservationStatus.Pending
-                    )
-                )
-                .ToListAsync(ct);
-            foreach (var stock in stocks)
-            {
-                foreach (
-                    var reservation in stock
-                        .Reservations.Where(r =>
-                            r.OrderId == cancelled.OrderId
-                            && r.Status
-                                == OrderFlow.Inventory.Domain.Reservations.ReservationStatus.Pending
-                        )
-                        .ToArray()
-                )
-                    stock.Release(reservation.Id);
-            }
+            await sender.Send(
+                new InventoryFeatures.ReleaseOrderInventoryCommand(cancelled.OrderId),
+                ct
+            );
             db.InboxMessages.Add(
                 new()
                 {
@@ -148,25 +132,24 @@ public sealed class OrderSubmittedConsumer(
         var message =
             JsonSerializer.Deserialize<OrderSubmittedIntegrationEvent>(env.Payload)
             ?? throw new JsonException("Order event is invalid.");
-        var ids = new List<Guid>();
-        string? error = null;
-        foreach (var item in message.Items)
-        {
-            var stock = await db
-                .StockItems.Include(x => x.Reservations)
-                .Where(x => x.ProductId == item.ProductId)
-                .OrderByDescending(x => x.QuantityOnHand - x.ReservedQuantity)
-                .FirstOrDefaultAsync(ct);
-            if (stock is null || stock.AvailableQuantity < item.Quantity)
-            {
-                error = $"Insufficient stock for product {item.ProductId}.";
-                break;
-            }
-            ids.Add(stock.Reserve(message.OrderId, item.Quantity).Id);
-        }
-        object outgoing = error is null
-            ? new InventoryReservedIntegrationEvent(message.OrderId, ids)
-            : new InventoryReservationFailedIntegrationEvent(message.OrderId, error);
+        var reservation = await sender.Send(
+            new InventoryFeatures.ReserveOrderInventoryCommand(
+                message.OrderId,
+                message
+                    .Items.Select(item => new InventoryFeatures.OrderInventoryItem(
+                        item.ProductId,
+                        item.Quantity
+                    ))
+                    .ToArray()
+            ),
+            ct
+        );
+        object outgoing = reservation.Succeeded
+            ? new InventoryReservedIntegrationEvent(message.OrderId, reservation.ReservationIds)
+            : new InventoryReservationFailedIntegrationEvent(
+                message.OrderId,
+                reservation.Error ?? "Inventory reservation failed."
+            );
         var outId = Guid.NewGuid();
         var outEnv = new IntegrationEventEnvelope(
             outId,

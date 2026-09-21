@@ -31,13 +31,21 @@ public sealed class Product : AggregateRoot
     }
 
     public Sku Sku { get; private set; }
+
     public string Name { get; private set; } = string.Empty;
+
     public string? Description { get; private set; }
+
     public Money Price { get; private set; }
+
     public Guid CategoryId { get; private set; }
+
     public ProductStatus Status { get; private set; } = ProductStatus.Draft;
+
     public DateTimeOffset CreatedAt { get; private set; }
+
     public DateTimeOffset UpdatedAt { get; private set; }
+
     public uint Version { get; private set; }
 
     public static Product Create(

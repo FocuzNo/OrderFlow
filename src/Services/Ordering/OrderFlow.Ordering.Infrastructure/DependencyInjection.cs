@@ -9,23 +9,40 @@ namespace OrderFlow.Ordering.Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection s, IConfiguration c)
+    public static IServiceCollection AddInfrastructure(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        var cs =
-            c.GetConnectionString("OrderingDatabase")
+        var connectionString =
+            configuration.GetConnectionString("OrderingDatabase")
             ?? throw new InvalidOperationException(
                 "ConnectionStrings:OrderingDatabase is required."
             );
-        _ =
-            c[$"{KafkaOptions.SectionName}:BootstrapServers"]
-            ?? throw new InvalidOperationException("Kafka:BootstrapServers is required.");
-        s.Configure<KafkaOptions>(c.GetSection(KafkaOptions.SectionName));
-        s.AddDbContext<OrderingDbContext>(x => x.UseNpgsql(cs).UseSnakeCaseNamingConvention());
-        s.AddScoped<IOrderRepository, OrderRepository>();
-        s.AddSingleton<IKafkaPublisher, KafkaPublisher>();
-        s.AddHostedService<OutboxProcessor>();
-        s.AddHostedService<WorkflowConsumer>();
-        s.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
-        return s;
+
+        services
+            .AddOptions<KafkaOptions>()
+            .Bind(configuration.GetSection(KafkaOptions.SectionName))
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.BootstrapServers),
+                "Kafka:BootstrapServers is required."
+            )
+            .Validate(options => options.MaxRetries > 0, "Kafka:MaxRetries must be positive.")
+            .Validate(
+                options => options.OutboxBatchSize > 0,
+                "Kafka:OutboxBatchSize must be positive."
+            )
+            .ValidateOnStart();
+
+        services.AddDbContext<OrderingDbContext>(options =>
+            options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
+        );
+        services.AddScoped<IOrderRepository, OrderRepository>();
+        services.AddSingleton<IKafkaPublisher, KafkaPublisher>();
+        services.AddHostedService<OutboxProcessor>();
+        services.AddHostedService<WorkflowConsumer>();
+        services.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
+
+        return services;
     }
 }

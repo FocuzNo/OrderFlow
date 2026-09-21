@@ -12,3 +12,4 @@ TestResults/
 **/coverage/
 *.coverage
 *.coveragexml
+AGENTS.md

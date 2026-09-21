@@ -15,8 +15,11 @@ public sealed record ShippingAddress
     }
 
     public string Line1 { get; init; } = string.Empty;
+
     public string City { get; init; } = string.Empty;
+
     public string PostalCode { get; init; } = string.Empty;
+
     public string Country { get; init; } = string.Empty;
 
     public static ShippingAddress Create(

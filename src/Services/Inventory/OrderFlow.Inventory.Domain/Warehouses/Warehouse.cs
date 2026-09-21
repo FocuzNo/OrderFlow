@@ -14,6 +14,7 @@ public sealed class Warehouse : Entity
     }
 
     public string Name { get; private set; } = string.Empty;
+
     public string Location { get; private set; } = string.Empty;
 
     public static Warehouse Create(string name, string location)

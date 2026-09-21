@@ -16,9 +16,13 @@ public sealed class OrderItem : Entity
     }
 
     public Guid ProductId { get; private set; }
+
     public string ProductName { get; private set; } = string.Empty;
+
     public decimal UnitPrice { get; private set; }
+
     public int Quantity { get; private set; }
+
     public decimal Total => UnitPrice * Quantity;
 
     public static OrderItem Create(

@@ -15,7 +15,9 @@ public sealed class NotificationDeliveryAttempt : Entity
     }
 
     public bool Succeeded { get; private set; }
+
     public string? Error { get; private set; }
+
     public DateTimeOffset AttemptedAt { get; private set; }
 
     public static NotificationDeliveryAttempt Create(bool succeeded, string? error) =>

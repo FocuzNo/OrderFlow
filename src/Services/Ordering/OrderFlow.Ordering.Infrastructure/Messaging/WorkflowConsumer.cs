@@ -105,7 +105,7 @@ public sealed class WorkflowConsumer(
         {
             case nameof(InventoryReservedIntegrationEvent):
                 await sender.Send(
-                    new OrderFeatures.InventoryReserved(
+                    new OrderFeatures.MarkInventoryReservedCommand(
                         JsonSerializer
                             .Deserialize<InventoryReservedIntegrationEvent>(envelope.Payload)!
                             .OrderId
@@ -119,7 +119,7 @@ public sealed class WorkflowConsumer(
                         envelope.Payload
                     )!;
                 await sender.Send(
-                    new OrderFeatures.WorkflowFailed(
+                    new OrderFeatures.FailOrderWorkflowCommand(
                         inventoryFailed.OrderId,
                         inventoryFailed.Reason
                     ),
@@ -128,7 +128,7 @@ public sealed class WorkflowConsumer(
                 break;
             case nameof(PaymentSucceededIntegrationEvent):
                 await sender.Send(
-                    new OrderFeatures.PaymentSucceeded(
+                    new OrderFeatures.ConfirmOrderPaymentCommand(
                         JsonSerializer
                             .Deserialize<PaymentSucceededIntegrationEvent>(envelope.Payload)!
                             .OrderId
@@ -141,7 +141,10 @@ public sealed class WorkflowConsumer(
                     envelope.Payload
                 )!;
                 await sender.Send(
-                    new OrderFeatures.WorkflowFailed(paymentFailed.OrderId, paymentFailed.Reason),
+                    new OrderFeatures.FailOrderWorkflowCommand(
+                        paymentFailed.OrderId,
+                        paymentFailed.Reason
+                    ),
                     ct
                 );
                 break;

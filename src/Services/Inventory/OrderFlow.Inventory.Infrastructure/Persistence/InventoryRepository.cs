@@ -28,6 +28,27 @@ public sealed class InventoryRepository(InventoryDbContext db) : IInventoryRepos
             .StockItems.Include(x => x.Reservations)
             .SingleOrDefaultAsync(x => x.ProductId == p && x.WarehouseId == w, ct);
 
+    public Task<StockItem?> GetBestAvailableStockAsync(Guid productId, CancellationToken ct) =>
+        db
+            .StockItems.Include(x => x.Reservations)
+            .Where(x => x.ProductId == productId)
+            .OrderByDescending(x => x.QuantityOnHand - x.ReservedQuantity)
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<IReadOnlyList<StockItem>> GetStockItemsWithPendingReservationsAsync(
+        Guid orderId,
+        CancellationToken ct
+    ) =>
+        await db
+            .StockItems.Include(x => x.Reservations)
+            .Where(x =>
+                x.Reservations.Any(reservation =>
+                    reservation.OrderId == orderId
+                    && reservation.Status == ReservationStatus.Pending
+                )
+            )
+            .ToListAsync(ct);
+
     public Task<StockReservation?> GetReservationAsync(Guid id, CancellationToken ct) =>
         db.Reservations.AsNoTracking().SingleOrDefaultAsync(x => x.Id == id, ct);
 

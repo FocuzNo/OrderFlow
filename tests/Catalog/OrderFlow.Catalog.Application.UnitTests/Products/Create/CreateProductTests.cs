@@ -16,7 +16,10 @@ public sealed class CreateProductTests
     {
         var category = Category.Create("Office", null);
         var products = new ProductRepository();
-        var handler = new ProductFeatures.CreateHandler(products, new CategoryRepository(category));
+        var handler = new ProductFeatures.CreateProductCommandHandler(
+            products,
+            new CategoryRepository(category)
+        );
 
         var result = await handler.Handle(
             new("SKU-1", "Notebook", null, 12.5m, category.Id),
@@ -42,7 +45,7 @@ public sealed class CreateProductTests
         await Assert.ThrowsAsync<ValidationException>(() =>
             services
                 .GetRequiredService<ISender>()
-                .Send(new ProductFeatures.Create("", "", null, -1, category.Id))
+                .Send(new ProductFeatures.CreateProductCommand("", "", null, -1, category.Id))
         );
         Assert.Null(products.Entity);
     }

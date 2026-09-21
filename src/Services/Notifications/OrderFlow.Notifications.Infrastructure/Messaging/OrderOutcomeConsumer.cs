@@ -125,10 +125,10 @@ public sealed class OrderOutcomeConsumer(
             body = $"Order {e.OrderId} was cancelled: {e.Reason}";
         }
         var n = await sender.Send(
-            new NotificationFeatures.Create(recipient, subject, body, "Email"),
+            new NotificationFeatures.CreateNotificationCommand(recipient, subject, body, "Email"),
             ct
         );
-        await sender.Send(new NotificationFeatures.Send(n.Id), ct);
+        await sender.Send(new NotificationFeatures.SendNotificationCommand(n.Id), ct);
         db.InboxMessages.Add(
             new()
             {

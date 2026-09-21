@@ -26,13 +26,21 @@ public sealed class Order : AggregateRoot
     }
 
     public Guid CustomerId { get; private set; }
+
     public EmailAddress CustomerEmail { get; private set; }
+
     public ShippingAddress ShippingAddress { get; private set; } = null!;
+
     public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
+
     public decimal TotalAmount => _items.Sum(x => x.Total);
+
     public OrderStatus Status { get; private set; } = OrderStatus.Draft;
+
     public DateTimeOffset CreatedAt { get; private set; }
+
     public DateTimeOffset UpdatedAt { get; private set; }
+
     public uint Version { get; private set; }
 
     public static Order Create(Guid customerId, string email, ShippingAddress address)

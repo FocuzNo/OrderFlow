@@ -27,12 +27,19 @@ public sealed class Notification : AggregateRoot
     }
 
     public string Recipient { get; private set; } = string.Empty;
+
     public string Subject { get; private set; } = string.Empty;
+
     public string Body { get; private set; } = string.Empty;
+
     public NotificationChannel Channel { get; private set; } = NotificationChannel.Email;
+
     public NotificationStatus Status { get; private set; } = NotificationStatus.Pending;
+
     public IReadOnlyCollection<NotificationDeliveryAttempt> Attempts => _attempts.AsReadOnly();
+
     public DateTimeOffset CreatedAt { get; private set; }
+
     public DateTimeOffset? SentAt { get; private set; }
 
     public static Notification Create(

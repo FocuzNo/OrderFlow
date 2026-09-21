@@ -10,8 +10,11 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
     : DbContext(o)
 {
     public DbSet<Notification> Notifications => Set<Notification>();
+
     public DbSet<NotificationDeliveryAttempt> Attempts => Set<NotificationDeliveryAttempt>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
@@ -61,44 +64,6 @@ public sealed class NotificationsDbContext(DbContextOptions<NotificationsDbConte
         return await base.SaveChangesAsync(ct);
     }
 
-    protected override void OnModelCreating(ModelBuilder m)
-    {
-        m.Entity<Notification>(b =>
-        {
-            b.ToTable("notifications");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Recipient).HasMaxLength(320);
-            b.Property(x => x.Subject).HasMaxLength(250);
-            b.Property(x => x.Body).HasMaxLength(10000);
-            b.Property(x => x.Channel)
-                .HasConversion(x => x.Value, x => NotificationChannel.FromValue(x));
-            b.Property(x => x.Status)
-                .HasConversion(x => x.Value, x => NotificationStatus.FromValue(x));
-            b.Ignore(x => x.DomainEvents);
-            b.HasMany(x => x.Attempts).WithOne().HasForeignKey("NotificationId");
-            b.HasIndex(x => new { x.Recipient, x.CreatedAt });
-        });
-        m.Entity<NotificationDeliveryAttempt>(b =>
-        {
-            b.ToTable("notification_delivery_attempts");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Error).HasMaxLength(2000);
-        });
-        m.Entity<OutboxMessage>(b =>
-        {
-            b.ToTable("outbox_messages");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Type).HasMaxLength(250);
-            b.Property(x => x.Content).HasColumnType("jsonb");
-            b.Property(x => x.AggregateId).HasMaxLength(100);
-            b.Property(x => x.Error).HasMaxLength(2000);
-            b.HasIndex(x => new { x.ProcessedOnUtc, x.OccurredOnUtc });
-        });
-        m.Entity<InboxMessage>(b =>
-        {
-            b.ToTable("inbox_messages");
-            b.HasKey(x => new { x.Id, x.Consumer });
-            b.Property(x => x.Consumer).HasMaxLength(200);
-        });
-    }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(NotificationsDbContext).Assembly);
 }

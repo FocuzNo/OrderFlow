@@ -104,10 +104,10 @@ public sealed class PaymentRequestedConsumer(
             ?? throw new JsonException("Payment event is invalid.");
         var sender = scope.ServiceProvider.GetRequiredService<ISender>();
         var payment = await sender.Send(
-            new PaymentFeatures.Create(e.OrderId, e.Amount, "Card"),
+            new PaymentFeatures.CreatePaymentCommand(e.OrderId, e.Amount, "Card"),
             ct
         );
-        await sender.Send(new PaymentFeatures.Process(payment.Id), ct);
+        await sender.Send(new PaymentFeatures.ProcessPaymentCommand(payment.Id), ct);
         db.InboxMessages.Add(
             new()
             {

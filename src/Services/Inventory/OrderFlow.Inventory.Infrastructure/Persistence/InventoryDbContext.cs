@@ -12,9 +12,13 @@ public sealed class InventoryDbContext(DbContextOptions<InventoryDbContext> opti
     : DbContext(options)
 {
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+
     public DbSet<StockItem> StockItems => Set<StockItem>();
+
     public DbSet<StockReservation> Reservations => Set<StockReservation>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
@@ -29,55 +33,6 @@ public sealed class InventoryDbContext(DbContextOptions<InventoryDbContext> opti
         return await base.SaveChangesAsync(ct);
     }
 
-    protected override void OnModelCreating(ModelBuilder m)
-    {
-        m.Entity<Warehouse>(b =>
-        {
-            b.ToTable("warehouses");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Name).HasMaxLength(120);
-            b.Property(x => x.Location).HasMaxLength(500);
-        });
-        m.Entity<StockItem>(b =>
-        {
-            b.ToTable("stock_items");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Sku).HasMaxLength(64);
-            b.HasIndex(x => new { x.ProductId, x.WarehouseId }).IsUnique();
-            b.Ignore(x => x.DomainEvents);
-            b.Ignore(x => x.AvailableQuantity);
-            b.HasMany(x => x.Reservations).WithOne().HasForeignKey(x => x.StockItemId);
-            b.Property(x => x.Version).IsRowVersion();
-        });
-        m.Entity<StockReservation>(b =>
-        {
-            b.ToTable("stock_reservations");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Status)
-                .HasConversion(x => x.Value, x => ReservationStatus.FromValue(x));
-            b.HasIndex(x => x.OrderId);
-        });
-        ConfigureMessaging(m);
-    }
-
-    private static void ConfigureMessaging(ModelBuilder m)
-    {
-        m.Entity<OutboxMessage>(b =>
-        {
-            b.ToTable("outbox_messages");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Type).HasMaxLength(250);
-            b.Property(x => x.Content).HasColumnType("jsonb");
-            b.Property(x => x.AggregateId).HasMaxLength(100);
-            b.Property(x => x.Error).HasMaxLength(2000);
-            b.HasIndex(x => new { x.ProcessedOnUtc, x.OccurredOnUtc });
-        });
-        m.Entity<InboxMessage>(b =>
-        {
-            b.ToTable("inbox_messages");
-            b.HasKey(x => new { x.Id, x.Consumer });
-            b.Property(x => x.Consumer).HasMaxLength(200);
-            b.Property(x => x.Error).HasMaxLength(2000);
-        });
-    }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(InventoryDbContext).Assembly);
 }

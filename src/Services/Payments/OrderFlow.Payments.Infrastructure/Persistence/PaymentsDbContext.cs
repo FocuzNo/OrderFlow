@@ -9,8 +9,11 @@ namespace OrderFlow.Payments.Infrastructure.Persistence;
 public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> o) : DbContext(o)
 {
     public DbSet<Payment> Payments => Set<Payment>();
+
     public DbSet<Refund> Refunds => Set<Refund>();
+
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
     public DbSet<InboxMessage> InboxMessages => Set<InboxMessage>();
 
     public override async Task<int> SaveChangesAsync(CancellationToken ct = default)
@@ -70,48 +73,6 @@ public sealed class PaymentsDbContext(DbContextOptions<PaymentsDbContext> o) : D
         return await base.SaveChangesAsync(ct);
     }
 
-    protected override void OnModelCreating(ModelBuilder m)
-    {
-        m.Entity<Payment>(b =>
-        {
-            b.ToTable("payments");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Amount).HasPrecision(18, 2);
-            b.Property(x => x.Method).HasConversion(x => x.Value, x => PaymentMethod.FromValue(x));
-            b.Property(x => x.Status).HasConversion(x => x.Value, x => PaymentStatus.FromValue(x));
-            b.Property(x => x.ProviderReference).HasMaxLength(200);
-            b.Property(x => x.FailureReason).HasMaxLength(1000);
-            b.HasIndex(x => x.OrderId).IsUnique();
-            b.Ignore(x => x.DomainEvents);
-            b.HasMany(x => x.Refunds).WithOne().HasForeignKey("PaymentId");
-        });
-        m.Entity<Refund>(b =>
-        {
-            b.ToTable("refunds");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Amount).HasPrecision(18, 2);
-            b.Property(x => x.Reason).HasMaxLength(1000);
-        });
-        Msg(m);
-    }
-
-    private static void Msg(ModelBuilder m)
-    {
-        m.Entity<OutboxMessage>(b =>
-        {
-            b.ToTable("outbox_messages");
-            b.HasKey(x => x.Id);
-            b.Property(x => x.Type).HasMaxLength(250);
-            b.Property(x => x.Content).HasColumnType("jsonb");
-            b.Property(x => x.AggregateId).HasMaxLength(100);
-            b.Property(x => x.Error).HasMaxLength(2000);
-            b.HasIndex(x => new { x.ProcessedOnUtc, x.OccurredOnUtc });
-        });
-        m.Entity<InboxMessage>(b =>
-        {
-            b.ToTable("inbox_messages");
-            b.HasKey(x => new { x.Id, x.Consumer });
-            b.Property(x => x.Consumer).HasMaxLength(200);
-        });
-    }
+    protected override void OnModelCreating(ModelBuilder modelBuilder) =>
+        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PaymentsDbContext).Assembly);
 }
