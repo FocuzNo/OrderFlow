@@ -1,20 +1,23 @@
 using FluentValidation;
+using MediatR;
+using OrderFlow.Catalog.Application.Abstractions.Errors;
+using OrderFlow.Catalog.Application.Abstractions.Messaging;
+using OrderFlow.Catalog.Application.Abstractions.Persistence;
 using OrderFlow.Catalog.Domain.Products;
 
-namespace OrderFlow.Catalog.Application.Products.Create;
+namespace OrderFlow.Catalog.Application.Products;
 
-public sealed class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
+public static partial class ProductFeatures
 {
-    public CreateProductCommandValidator()
+    public sealed class CreateProductCommandValidator : AbstractValidator<CreateProductCommand>
     {
-        RuleFor(command => command.Name)
-            .NotEmpty()
-            .MaximumLength(Product.MaxNameLength);
-
-        RuleFor(command => command.Description)
-            .MaximumLength(Product.MaxDescriptionLength);
-
-        RuleFor(command => command.Price)
-            .GreaterThanOrEqualTo(0m);
+        public CreateProductCommandValidator()
+        {
+            RuleFor(x => x.Sku).NotEmpty().MaximumLength(Sku.MaxLength);
+            RuleFor(x => x.Name).NotEmpty().MaximumLength(Product.MaxNameLength);
+            RuleFor(x => x.Description).MaximumLength(Product.MaxDescriptionLength);
+            RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
+            RuleFor(x => x.CategoryId).NotEmpty();
+        }
     }
 }

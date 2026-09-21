@@ -1,0 +1,28 @@
+using Microsoft.EntityFrameworkCore;
+using OrderFlow.Catalog.Application.Abstractions.Persistence;
+using OrderFlow.Catalog.Domain.Categories;
+
+namespace OrderFlow.Catalog.Infrastructure.Persistence.Repositories;
+
+public sealed class CategoryRepository(CatalogDbContext db) : ICategoryRepository
+{
+    public Task<Category?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        db.Categories.SingleOrDefaultAsync(x => x.Id == id, ct);
+
+    public async Task<IReadOnlyList<Category>> ListAsync(CancellationToken ct) =>
+        await db.Categories.AsNoTracking().OrderBy(x => x.Name).ToListAsync(ct);
+
+    public Task<bool> NameExistsAsync(string name, Guid? excluding, CancellationToken ct) =>
+        db.Categories.AnyAsync(
+            x => x.Name == name && (!excluding.HasValue || x.Id != excluding),
+            ct
+        );
+
+    public async Task AddAsync(Category x, CancellationToken ct)
+    {
+        db.Categories.Add(x);
+        await db.SaveChangesAsync(ct);
+    }
+
+    public async Task SaveAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
+}

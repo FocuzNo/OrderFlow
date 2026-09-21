@@ -1,0 +1,21 @@
+using MediatR;
+using OrderFlow.Inventory.Application.Abstractions.Errors;
+using OrderFlow.Inventory.Application.Abstractions.Messaging;
+using OrderFlow.Inventory.Application.Abstractions.Persistence;
+using OrderFlow.Inventory.Domain.Stock;
+using OrderFlow.Inventory.Domain.Warehouses;
+
+namespace OrderFlow.Inventory.Application.Inventory;
+
+public static partial class InventoryFeatures
+{
+    public sealed record StockResponse(
+        Guid Id,
+        Guid ProductId,
+        Guid WarehouseId,
+        string Sku,
+        int OnHand,
+        int Reserved,
+        int Available
+    );
+}

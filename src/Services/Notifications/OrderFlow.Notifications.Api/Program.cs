@@ -1,0 +1,70 @@
+using FastEndpoints;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using OrderFlow.Notifications.Api.ExceptionHandling;
+using OrderFlow.Notifications.Api.Middleware;
+using OrderFlow.Notifications.Application;
+using OrderFlow.Notifications.Infrastructure;
+using OrderFlow.Notifications.Infrastructure.Persistence;
+using Serilog;
+
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddSerilog(
+    (services, c) =>
+        c
+            .ReadFrom.Configuration(builder.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Service", "OrderFlow.Notifications")
+            .Enrich.WithProperty("Environment", builder.Environment.EnvironmentName)
+            .WriteTo.Console()
+);
+builder.Services.AddApplication().AddInfrastructure(builder.Configuration);
+builder.Services.AddFastEndpoints();
+builder.Services.AddOpenApi();
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<ApiExceptionHandler>();
+builder
+    .Services.AddHealthChecks()
+    .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
+    .AddDbContextCheck<NotificationsDbContext>("postgres", tags: ["ready"]);
+builder
+    .Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("OrderFlow.Notifications"))
+    .WithTracing(t =>
+        t.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql", "OrderFlow.Notifications.Kafka")
+            .AddOtlpExporter()
+    )
+    .WithMetrics(m =>
+        m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddOtlpExporter()
+    );
+var app = builder.Build();
+if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
+{
+    await using var scope = app.Services.CreateAsyncScope();
+    await scope
+        .ServiceProvider.GetRequiredService<NotificationsDbContext>()
+        .Database.MigrateAsync();
+    return;
+}
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseSerilogRequestLogging();
+app.UseExceptionHandler();
+app.UseFastEndpoints();
+app.MapOpenApi();
+app.MapHealthChecks(
+    "/health/live",
+    new HealthCheckOptions { Predicate = x => x.Tags.Contains("live") }
+);
+app.MapHealthChecks(
+    "/health/ready",
+    new HealthCheckOptions { Predicate = x => x.Tags.Contains("ready") }
+);
+app.Run();
+
+public partial class Program;

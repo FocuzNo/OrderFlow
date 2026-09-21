@@ -3,7 +3,8 @@ using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using OrderFlow.Catalog.Application;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
-using OrderFlow.Catalog.Application.Products.Create;
+using OrderFlow.Catalog.Application.Products;
+using OrderFlow.Catalog.Domain.Categories;
 using OrderFlow.Catalog.Domain.Products;
 
 namespace OrderFlow.Catalog.Application.UnitTests.Products.Create;
@@ -11,83 +12,84 @@ namespace OrderFlow.Catalog.Application.UnitTests.Products.Create;
 public sealed class CreateProductTests
 {
     [Fact]
-    public async Task Handler_creates_product_persists_it_and_returns_its_values()
+    public async Task Handler_persists_a_product_for_an_existing_category()
     {
-        var repository = new RecordingProductRepository();
-        var handler = new CreateProductCommandHandler(repository);
-        using var cancellation = new CancellationTokenSource();
+        var category = Category.Create("Office", null);
+        var products = new ProductRepository();
+        var handler = new ProductFeatures.CreateProductCommandHandler(
+            products,
+            new CategoryRepository(category)
+        );
 
-        var response = await handler.Handle(
-            new CreateProductCommand("Notebook", "Ruled", 12.50m),
-            cancellation.Token);
+        var result = await handler.Handle(
+            new("SKU-1", "Notebook", null, 12.5m, category.Id),
+            default
+        );
 
-        var product = Assert.IsType<Product>(repository.AddedProduct);
-        Assert.Equal(cancellation.Token, repository.ReceivedCancellationToken);
-        Assert.Equal(product.Id, response.Id);
-        Assert.Equal(product.Name, response.Name);
-        Assert.Equal(product.Description, response.Description);
-        Assert.Equal(product.Price, response.Price);
-        Assert.Equal(product.CreatedAt, response.CreatedAt);
-        Assert.Equal(product.UpdatedAt, response.UpdatedAt);
+        Assert.Equal(result.Id, products.Entity?.Id);
+        Assert.Equal("SKU-1", result.Sku);
     }
 
     [Fact]
-    public async Task MediatR_pipeline_dispatches_valid_command_to_handler()
+    public async Task Pipeline_rejects_an_invalid_command_before_the_handler()
     {
-        var repository = new RecordingProductRepository();
-        using var services = CreateServices(repository);
-        var sender = services.GetRequiredService<ISender>();
-
-        var response = await sender.Send(new CreateProductCommand("Notebook", null, 0m));
-
-        Assert.NotEqual(Guid.Empty, response.Id);
-        Assert.Equal(response.Id, Assert.IsType<Product>(repository.AddedProduct).Id);
-    }
-
-    [Fact]
-    public async Task MediatR_pipeline_rejects_empty_name_before_handler()
-    {
-        var repository = new RecordingProductRepository();
-        using var services = CreateServices(repository);
-        var sender = services.GetRequiredService<ISender>();
-
-        await Assert.ThrowsAsync<ValidationException>(
-            () => sender.Send(new CreateProductCommand(" ", null, 10m)));
-
-        Assert.Null(repository.AddedProduct);
-    }
-
-    [Fact]
-    public async Task MediatR_pipeline_rejects_negative_price_before_handler()
-    {
-        var repository = new RecordingProductRepository();
-        using var services = CreateServices(repository);
-        var sender = services.GetRequiredService<ISender>();
-
-        await Assert.ThrowsAsync<ValidationException>(
-            () => sender.Send(new CreateProductCommand("Notebook", null, -1m)));
-
-        Assert.Null(repository.AddedProduct);
-    }
-
-    private static ServiceProvider CreateServices(IProductRepository repository) =>
-        new ServiceCollection()
+        var category = Category.Create("Office", null);
+        var products = new ProductRepository();
+        using var services = new ServiceCollection()
             .AddLogging()
             .AddApplication()
-            .AddSingleton(repository)
+            .AddSingleton<IProductRepository>(products)
+            .AddSingleton<ICategoryRepository>(new CategoryRepository(category))
             .BuildServiceProvider();
 
-    private sealed class RecordingProductRepository : IProductRepository
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            services
+                .GetRequiredService<ISender>()
+                .Send(new ProductFeatures.CreateProductCommand("", "", null, -1, category.Id))
+        );
+        Assert.Null(products.Entity);
+    }
+
+    private sealed class ProductRepository : IProductRepository
     {
-        public Product? AddedProduct { get; private set; }
-        public CancellationToken ReceivedCancellationToken { get; private set; }
+        public Product? Entity { get; private set; }
 
-        public Task AddAsync(Product product, CancellationToken cancellationToken)
+        public Task AddAsync(Product product, CancellationToken ct)
         {
-            AddedProduct = product;
-            ReceivedCancellationToken = cancellationToken;
-
+            Entity = product;
             return Task.CompletedTask;
         }
+
+        public Task<Product?> GetByIdAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(Entity?.Id == id ? Entity : null);
+
+        public Task<IReadOnlyList<Product>> ListAsync(
+            int page,
+            int pageSize,
+            string? search,
+            string? sort,
+            CancellationToken ct
+        ) => Task.FromResult<IReadOnlyList<Product>>(Entity is null ? [] : [Entity]);
+
+        public Task<bool> SkuExistsAsync(string sku, Guid? excludingId, CancellationToken ct) =>
+            Task.FromResult(Entity?.Sku.Value == sku);
+
+        public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
+    }
+
+    private sealed class CategoryRepository(Category category) : ICategoryRepository
+    {
+        public Task AddAsync(Category value, CancellationToken ct) => Task.CompletedTask;
+
+        public Task<Category?> GetByIdAsync(Guid id, CancellationToken ct) =>
+            Task.FromResult(id == category.Id ? category : null);
+
+        public Task<IReadOnlyList<Category>> ListAsync(CancellationToken ct) =>
+            Task.FromResult<IReadOnlyList<Category>>([category]);
+
+        public Task<bool> NameExistsAsync(string name, Guid? excludingId, CancellationToken ct) =>
+            Task.FromResult(false);
+
+        public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
     }
 }

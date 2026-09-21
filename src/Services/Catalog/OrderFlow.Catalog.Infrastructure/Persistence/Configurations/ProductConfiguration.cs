@@ -6,39 +6,22 @@ namespace OrderFlow.Catalog.Infrastructure.Persistence.Configurations;
 
 public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
 {
-    public void Configure(EntityTypeBuilder<Product> builder)
+    public void Configure(EntityTypeBuilder<Product> b)
     {
-        builder.ToTable("products");
-
-        builder.HasKey(product => product.Id);
-
-        builder.Property(product => product.Id)
-            .HasColumnName("id")
-            .ValueGeneratedNever();
-
-        builder.Property(product => product.Name)
-            .HasColumnName("name")
-            .HasMaxLength(Product.MaxNameLength)
-            .IsRequired();
-
-        builder.Property(product => product.Description)
-            .HasColumnName("description")
-            .HasMaxLength(Product.MaxDescriptionLength)
-            .IsRequired(false);
-
-        builder.Property(product => product.Price)
-            .HasColumnName("price")
-            .HasPrecision(18, 2)
-            .IsRequired();
-
-        builder.Property(product => product.CreatedAt)
-            .HasColumnName("created_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
-
-        builder.Property(product => product.UpdatedAt)
-            .HasColumnName("updated_at")
-            .HasColumnType("timestamp with time zone")
-            .IsRequired();
+        b.ToTable("products");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Sku)
+            .HasConversion(x => x.Value, x => Sku.Create(x))
+            .HasMaxLength(Sku.MaxLength);
+        b.HasIndex(x => x.Sku).IsUnique();
+        b.Property(x => x.Name).HasMaxLength(Product.MaxNameLength);
+        b.Property(x => x.Description).HasMaxLength(Product.MaxDescriptionLength);
+        b.Property(x => x.Price)
+            .HasConversion(x => x.Amount, x => Money.From(x))
+            .HasPrecision(18, 2);
+        b.Property(x => x.Status).HasConversion(x => x.Value, x => ProductStatus.FromValue(x));
+        b.HasIndex(x => x.CategoryId);
+        b.Ignore(x => x.DomainEvents);
+        b.Property(x => x.Version).IsRowVersion();
     }
 }

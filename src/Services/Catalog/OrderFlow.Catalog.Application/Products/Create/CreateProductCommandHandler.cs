@@ -1,26 +1,28 @@
+using FluentValidation;
 using MediatR;
+using OrderFlow.Catalog.Application.Abstractions.Errors;
+using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
 using OrderFlow.Catalog.Domain.Products;
 
-namespace OrderFlow.Catalog.Application.Products.Create;
+namespace OrderFlow.Catalog.Application.Products;
 
-public sealed class CreateProductCommandHandler(IProductRepository productRepository)
-    : IRequestHandler<CreateProductCommand, CreateProductResponse>
+public static partial class ProductFeatures
 {
-    public async Task<CreateProductResponse> Handle(
-        CreateProductCommand command,
-        CancellationToken cancellationToken)
+    public sealed class CreateProductCommandHandler(
+        IProductRepository products,
+        ICategoryRepository categories
+    ) : IRequestHandler<CreateProductCommand, ProductResponse>
     {
-        var product = Product.Create(command.Name, command.Description, command.Price);
-
-        await productRepository.AddAsync(product, cancellationToken);
-
-        return new CreateProductResponse(
-            product.Id,
-            product.Name,
-            product.Description,
-            product.Price,
-            product.CreatedAt,
-            product.UpdatedAt);
+        public async Task<ProductResponse> Handle(CreateProductCommand c, CancellationToken ct)
+        {
+            if (await products.SkuExistsAsync(c.Sku, null, ct))
+                throw new ConflictException("SKU already exists.");
+            if (await categories.GetByIdAsync(c.CategoryId, ct) is null)
+                throw new NotFoundException("Category was not found.");
+            var product = Product.Create(c.Sku, c.Name, c.Description, c.Price, c.CategoryId);
+            await products.AddAsync(product, ct);
+            return ProductResponse.From(product);
+        }
     }
 }

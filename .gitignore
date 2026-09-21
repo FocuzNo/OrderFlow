@@ -7,6 +7,9 @@
 *.suo
 *.rsuser
 TestResults/
+.env
+!.env.example
 **/coverage/
 *.coverage
 *.coveragexml
+AGENTS.md
