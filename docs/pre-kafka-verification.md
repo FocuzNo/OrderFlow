@@ -24,7 +24,7 @@ Each write slice has a command, handler and input validator; read slices use que
 
 CatalogDbContext, OrderingDbContext, InventoryDbContext, PaymentsDbContext and NotificationsDbContext each implement their own IUnitOfWork. Service-owned generic repositories stage changes and aggregate-specific repositories implement relevant queries. Handlers commit explicitly.
 
-Each context has its own InitialCreate migration and snapshot. All five design-time contexts were created successfully; migrations list successfully without a database connection; EF reports no pending model changes. This does not prove migration application against PostgreSQL.
+Each context has its own InitialCreate migration and snapshot. Inventory, Payments and Notifications also have a small `FixGeneratedKeys` migration that marks aggregate child Guid keys as database-independent keys, so EF inserts new reservations, refunds and delivery attempts correctly. All five design-time contexts were created successfully; migrations list successfully without a database connection; EF reports no pending model changes.
 
 Configurations define relationships, required values, lengths, money precision (18,2), SmartEnum conversions and indexes. Important unique indexes: Catalog SKU/category name, Inventory ProductId, Payments OrderId. Ordering customer/date and Notifications order/recipient indexes support read use cases. PostgreSQL xmin provides optimistic concurrency for aggregate writes, including stock reservations.
 
@@ -42,15 +42,14 @@ Five multi-stage Dockerfiles use .NET 10 and non-root runtime users. Compose con
 
 - dotnet tool restore and dotnet restore succeeded.
 - Solution build: zero errors and zero warnings.
-- Tests: 36 passed; 6 PostgreSQL Testcontainers tests explicitly skipped.
+- Tests: 36 unit/application tests passed. With Docker enabled, all 7 PostgreSQL Testcontainers tests passed.
 - Container tests cover product persistence, order items, inventory reservation/uniqueness/concurrency, payment uniqueness and notification history.
 - Docker Compose configuration validation succeeded.
-- Docker daemon is unavailable (dockerDesktopLinuxEngine pipe missing). Images, Compose startup, actual migration application and persisted HTTP CRUD were therefore not verified.
-- Local API startup/liveness and nonempty OpenAPI were checked for all five services during this session.
-- Notifications readiness returned 503 with a deliberately unavailable database.
+- Docker images for all five APIs built successfully. Five PostgreSQL containers became healthy, all migrations applied, and all five API containers became healthy.
+- Runtime smoke test: 53/53 checks passed across liveness/readiness, OpenAPI, Catalog CRUD, Inventory CRUD/reservation/concurrency conflicts, Ordering create/read/cancel, Payments success/failure/duplicate/refund and Notifications create/read/send.
 - Invalid Notifications and Ordering POST requests returned 400; Ordering empty/null/null-element item collections returned application/problem+json.
 - Project-reference audit and source search found no cross-service references or Kafka/Outbox/Inbox/Saga implementation.
-- Git diff whitespace check passed. HEAD remains cf9fa3f; the existing stash is untouched.
+- Git diff whitespace check passed; the existing stash is untouched.
 
 ## Deliberate limits
 
