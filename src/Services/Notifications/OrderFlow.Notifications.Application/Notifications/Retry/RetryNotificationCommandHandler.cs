@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;
@@ -13,8 +12,8 @@ public static partial class NotificationFeatures
         : IRequestHandler<RetryNotificationCommand, NotificationResponse>
     {
         public Task<NotificationResponse> Handle(
-            RetryNotificationCommand c,
-            CancellationToken ct
-        ) => mediator.Send(new SendNotificationCommand(c.Id), ct);
+            RetryNotificationCommand command,
+            CancellationToken cancellationToken
+        ) => mediator.Send(new SendNotificationCommand(command.Id), cancellationToken);
     }
 }

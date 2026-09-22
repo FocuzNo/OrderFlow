@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -10,24 +9,25 @@ namespace OrderFlow.Inventory.Application.Inventory;
 public static partial class InventoryFeatures
 {
     private static async Task<StockItem> Find(
-        IInventoryRepository r,
-        Guid p,
-        Guid w,
-        CancellationToken ct
+        IInventoryRepository repository,
+        Guid productId,
+        Guid warehouseId,
+        CancellationToken cancellationToken
     ) =>
-        await r.GetStockAsync(p, w, ct) ?? throw new NotFoundException("Stock item was not found.");
+        await repository.GetStockAsync(productId, warehouseId, cancellationToken)
+        ?? throw new NotFoundException("Stock item was not found.");
 
-    private static StockResponse Map(StockItem x) =>
+    private static StockResponse Map(StockItem entity) =>
         new(
-            x.Id,
-            x.ProductId,
-            x.WarehouseId,
-            x.Sku,
-            x.QuantityOnHand,
-            x.ReservedQuantity,
-            x.AvailableQuantity
+            entity.Id,
+            entity.ProductId,
+            entity.WarehouseId,
+            entity.Sku,
+            entity.QuantityOnHand,
+            entity.ReservedQuantity,
+            entity.AvailableQuantity
         );
 
-    private static ReservationResponse Map(Domain.Reservations.StockReservation x) =>
-        new(x.Id, x.OrderId, x.StockItemId, x.Quantity, x.Status.Name);
+    private static ReservationResponse Map(Domain.Reservations.StockReservation entity) =>
+        new(entity.Id, entity.OrderId, entity.StockItemId, entity.Quantity, entity.Status.Name);
 }

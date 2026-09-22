@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -10,6 +9,7 @@ public static partial class CategoryFeatures
 {
     public sealed record CategoryResponse(Guid Id, string Name, string? Description)
     {
-        public static CategoryResponse From(Category x) => new(x.Id, x.Name, x.Description);
+        public static CategoryResponse From(Category candidate) =>
+            new(candidate.Id, candidate.Name, candidate.Description);
     }
 }

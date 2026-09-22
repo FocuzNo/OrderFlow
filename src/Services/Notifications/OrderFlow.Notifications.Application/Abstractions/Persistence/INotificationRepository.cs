@@ -2,10 +2,20 @@ using OrderFlow.Notifications.Domain.Notifications;
 
 namespace OrderFlow.Notifications.Application.Abstractions.Persistence;
 
-public interface INotificationRepository
+public interface INotificationRepository : IRepository<Notification>
 {
-    Task<Notification?> GetAsync(Guid id, CancellationToken ct);
-    Task<IReadOnlyList<Notification>> GetForRecipientAsync(string recipient, CancellationToken ct);
-    Task AddAsync(Notification notification, CancellationToken ct);
-    Task SaveAsync(CancellationToken ct);
+    Task<IReadOnlyList<Notification>> GetByOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken
+    );
+    Task<IReadOnlyList<Notification>> ListAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken
+    );
+    Task<Notification?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Notification>> GetForRecipientAsync(
+        string recipient,
+        CancellationToken cancellationToken
+    );
 }

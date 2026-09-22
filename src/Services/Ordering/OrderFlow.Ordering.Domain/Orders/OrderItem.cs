@@ -32,7 +32,11 @@ public sealed class OrderItem : Entity
         int quantity
     )
     {
-        if (productId == Guid.Empty || string.IsNullOrWhiteSpace(productName))
+        if (
+            productId == Guid.Empty
+            || string.IsNullOrWhiteSpace(productName)
+            || productName.Length > 200
+        )
             throw new DomainException("Product snapshot is required.");
         if (unitPrice < 0 || quantity <= 0)
             throw new DomainException(

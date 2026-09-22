@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Inventory.Application.Inventory;
 
 public sealed class ReserveInventoryCommandValidator
@@ -7,7 +5,7 @@ public sealed class ReserveInventoryCommandValidator
 {
     public ReserveInventoryCommandValidator()
     {
-        RuleFor(x => x.OrderId).NotEmpty();
-        RuleFor(x => x.Quantity).GreaterThan(0);
+        RuleFor(candidate => candidate.OrderId).NotEmpty();
+        RuleFor(candidate => candidate.Quantity).GreaterThan(0);
     }
 }

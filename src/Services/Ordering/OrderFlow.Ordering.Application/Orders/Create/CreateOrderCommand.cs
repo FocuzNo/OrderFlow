@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -11,6 +10,7 @@ public static partial class OrderFeatures
     public sealed record CreateOrderCommand(
         Guid CustomerId,
         string CustomerEmail,
-        ShippingAddressInput ShippingAddress
+        ShippingAddressInput ShippingAddress,
+        IReadOnlyList<OrderItemInput> Items
     ) : ICommand<OrderResponse>;
 }

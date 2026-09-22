@@ -1,4 +1,3 @@
-using FastEndpoints;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -14,8 +13,8 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSerilog(
-    (services, c) =>
-        c
+    (services, configuration) =>
+        configuration
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Service", "OrderFlow.Payments")
@@ -33,15 +32,19 @@ builder
     .AddDbContextCheck<PaymentsDbContext>("postgres", tags: ["ready"]);
 builder
     .Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService("OrderFlow.Payments"))
-    .WithTracing(t =>
-        t.AddAspNetCoreInstrumentation()
+    .ConfigureResource(resourceBuilder => resourceBuilder.AddService("OrderFlow.Payments"))
+    .WithTracing(tracingBuilder =>
+        tracingBuilder
+            .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql", "OrderFlow.Payments.Kafka")
+            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql")
             .AddOtlpExporter()
     )
-    .WithMetrics(m =>
-        m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddOtlpExporter()
+    .WithMetrics(metricsBuilder =>
+        metricsBuilder
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter()
     );
 var app = builder.Build();
 if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
@@ -57,11 +60,11 @@ app.UseFastEndpoints();
 app.MapOpenApi();
 app.MapHealthChecks(
     "/health/live",
-    new HealthCheckOptions { Predicate = x => x.Tags.Contains("live") }
+    new HealthCheckOptions { Predicate = candidate => candidate.Tags.Contains("live") }
 );
 app.MapHealthChecks(
     "/health/ready",
-    new HealthCheckOptions { Predicate = x => x.Tags.Contains("ready") }
+    new HealthCheckOptions { Predicate = candidate => candidate.Tags.Contains("ready") }
 );
 app.Run();
 

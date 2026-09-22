@@ -1,5 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OrderFlow.Inventory.Domain.Reservations;
 
 namespace OrderFlow.Inventory.Infrastructure.Persistence.Configurations;
@@ -9,10 +7,13 @@ public sealed class StockReservationConfiguration : IEntityTypeConfiguration<Sto
     public void Configure(EntityTypeBuilder<StockReservation> builder)
     {
         builder.ToTable("stock_reservations");
-        builder.HasKey(x => x.Id);
+        builder.HasKey(candidate => candidate.Id);
         builder
-            .Property(x => x.Status)
-            .HasConversion(x => x.Value, x => ReservationStatus.FromValue(x));
-        builder.HasIndex(x => x.OrderId);
+            .Property(candidate => candidate.Status)
+            .HasConversion(
+                candidate => candidate.Value,
+                candidate => ReservationStatus.FromValue(candidate)
+            );
+        builder.HasIndex(candidate => candidate.OrderId);
     }
 }

@@ -1,5 +1,3 @@
-using MediatR;
-
 namespace OrderFlow.Catalog.Application.Abstractions.Messaging;
 
 public interface ICommand : IRequest;

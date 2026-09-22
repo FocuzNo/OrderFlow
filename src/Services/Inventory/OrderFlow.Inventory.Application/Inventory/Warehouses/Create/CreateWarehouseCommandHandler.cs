@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -9,14 +8,20 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class CreateWarehouseCommandHandler(IInventoryRepository r)
-        : IRequestHandler<CreateWarehouseCommand, WarehouseResponse>
+    public sealed class CreateWarehouseCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<CreateWarehouseCommand, WarehouseResponse>
     {
-        public async Task<WarehouseResponse> Handle(CreateWarehouseCommand c, CancellationToken ct)
+        public async Task<WarehouseResponse> Handle(
+            CreateWarehouseCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = Warehouse.Create(c.Name, c.Location);
-            await r.AddWarehouseAsync(x, ct);
-            return new(x.Id, x.Name, x.Location);
+            var entity = Warehouse.Create(command.Name, command.Location);
+            await repository.AddAsync(entity, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return new(entity.Id, entity.Name, entity.Location);
         }
     }
 }

@@ -1,30 +1,50 @@
-using Microsoft.EntityFrameworkCore;
 using OrderFlow.Notifications.Application.Abstractions.Persistence;
 using OrderFlow.Notifications.Domain.Notifications;
+using OrderFlow.Notifications.Infrastructure.Persistence.Repositories;
 
 namespace OrderFlow.Notifications.Infrastructure.Persistence;
 
-public sealed class NotificationRepository(NotificationsDbContext db) : INotificationRepository
+public sealed class NotificationRepository(NotificationsDbContext databaseContext)
+    : Repository<Notification>(databaseContext),
+        INotificationRepository
 {
-    public Task<Notification?> GetAsync(Guid id, CancellationToken ct) =>
-        db.Notifications.Include(x => x.Attempts).SingleOrDefaultAsync(x => x.Id == id, ct);
+    public async Task<IReadOnlyList<Notification>> GetByOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
+            .Notifications.AsNoTracking()
+            .Include(notification => notification.Attempts)
+            .Where(notification => notification.OrderId == orderId)
+            .OrderBy(notification => notification.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Notification>> ListAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
+            .Notifications.AsNoTracking()
+            .Include(notification => notification.Attempts)
+            .OrderBy(entity => entity.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<Notification?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        DatabaseContext
+            .Notifications.Include(candidate => candidate.Attempts)
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
     public async Task<IReadOnlyList<Notification>> GetForRecipientAsync(
         string recipient,
-        CancellationToken ct
+        CancellationToken cancellationToken
     ) =>
-        await db
+        await DatabaseContext
             .Notifications.AsNoTracking()
-            .Include(x => x.Attempts)
-            .Where(x => x.Recipient == recipient)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(ct);
-
-    public async Task AddAsync(Notification x, CancellationToken ct)
-    {
-        db.Notifications.Add(x);
-        await db.SaveChangesAsync(ct);
-    }
-
-    public async Task SaveAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
+            .Include(candidate => candidate.Attempts)
+            .Where(candidate => candidate.Recipient == recipient)
+            .OrderByDescending(candidate => candidate.CreatedAt)
+            .ToListAsync(cancellationToken);
 }

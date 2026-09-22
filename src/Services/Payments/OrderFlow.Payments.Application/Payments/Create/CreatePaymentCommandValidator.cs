@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Payments.Application.Payments;
 
 public sealed class CreatePaymentCommandValidator
@@ -7,8 +5,14 @@ public sealed class CreatePaymentCommandValidator
 {
     public CreatePaymentCommandValidator()
     {
-        RuleFor(x => x.OrderId).NotEmpty();
-        RuleFor(x => x.Amount).GreaterThan(0);
-        RuleFor(x => x.Method).NotEmpty();
+        RuleFor(candidate => candidate.OrderId).NotEmpty();
+        RuleFor(candidate => candidate.Amount).GreaterThan(0).PrecisionScale(18, 2, true);
+        RuleFor(candidate => candidate.Method)
+            .NotEmpty()
+            .Must(method =>
+                OrderFlow.Payments.Domain.Payments.PaymentMethod.List.Any(value =>
+                    string.Equals(value.Name, method, StringComparison.OrdinalIgnoreCase)
+                )
+            );
     }
 }

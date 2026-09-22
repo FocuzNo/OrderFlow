@@ -99,9 +99,9 @@ namespace OrderFlow.Inventory.Infrastructure.Migrations
                     b.HasKey("Id")
                         .HasName("pk_stock_items");
 
-                    b.HasIndex("ProductId", "WarehouseId")
+                    b.HasIndex("ProductId")
                         .IsUnique()
-                        .HasDatabaseName("ix_stock_items_product_id_warehouse_id");
+                        .HasDatabaseName("ix_stock_items_product_id");
 
                     b.ToTable("stock_items", (string)null);
                 });
@@ -129,82 +129,6 @@ namespace OrderFlow.Inventory.Infrastructure.Migrations
                         .HasName("pk_warehouses");
 
                     b.ToTable("warehouses", (string)null);
-                });
-
-            modelBuilder.Entity("OrderFlow.Inventory.Infrastructure.Persistence.InboxMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("Consumer")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("consumer");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("error");
-
-                    b.Property<DateTimeOffset>("ProcessedOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_on_utc");
-
-                    b.HasKey("Id", "Consumer")
-                        .HasName("pk_inbox_messages");
-
-                    b.ToTable("inbox_messages", (string)null);
-                });
-
-            modelBuilder.Entity("OrderFlow.Inventory.Infrastructure.Persistence.OutboxMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<string>("AggregateId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("aggregate_id");
-
-                    b.Property<string>("Content")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("content");
-
-                    b.Property<string>("Error")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("error");
-
-                    b.Property<DateTimeOffset>("OccurredOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("occurred_on_utc");
-
-                    b.Property<DateTimeOffset?>("ProcessedOnUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("processed_on_utc");
-
-                    b.Property<int>("RetryCount")
-                        .HasColumnType("integer")
-                        .HasColumnName("retry_count");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasMaxLength(250)
-                        .HasColumnType("character varying(250)")
-                        .HasColumnName("type");
-
-                    b.HasKey("Id")
-                        .HasName("pk_outbox_messages");
-
-                    b.HasIndex("ProcessedOnUtc", "OccurredOnUtc")
-                        .HasDatabaseName("ix_outbox_messages_processed_on_utc_occurred_on_utc");
-
-                    b.ToTable("outbox_messages", (string)null);
                 });
 
             modelBuilder.Entity("OrderFlow.Inventory.Domain.Reservations.StockReservation", b =>

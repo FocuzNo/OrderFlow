@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;

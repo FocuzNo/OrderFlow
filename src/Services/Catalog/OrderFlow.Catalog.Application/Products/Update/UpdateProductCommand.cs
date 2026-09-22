@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -13,6 +11,7 @@ public static partial class ProductFeatures
         Guid Id,
         string Name,
         string? Description,
-        Guid CategoryId
+        Guid CategoryId,
+        decimal Price
     ) : ICommand<ProductResponse>;
 }

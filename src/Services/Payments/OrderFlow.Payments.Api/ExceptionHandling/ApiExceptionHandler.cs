@@ -7,23 +7,36 @@ namespace OrderFlow.Payments.Api.ExceptionHandling;
 
 public sealed class ApiExceptionHandler : IExceptionHandler
 {
-    public async ValueTask<bool> TryHandleAsync(HttpContext c, Exception e, CancellationToken ct)
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext httpContext,
+        Exception exception,
+        CancellationToken cancellationToken
+    )
     {
-        if (e is ValidationException v)
+        if (exception is ValidationException validationException)
         {
             await Results
                 .ValidationProblem(
-                    v.Errors.GroupBy(x => x.PropertyName)
-                        .ToDictionary(x => x.Key, x => x.Select(y => y.ErrorMessage).ToArray())
+                    validationException
+                        .Errors.GroupBy(candidate => candidate.PropertyName)
+                        .ToDictionary(
+                            candidate => candidate.Key,
+                            candidate => candidate.Select(failure => failure.ErrorMessage).ToArray()
+                        )
                 )
-                .ExecuteAsync(c);
+                .ExecuteAsync(httpContext);
             return true;
         }
-        var status = e switch
+        var status = exception switch
         {
             NotFoundException => 404,
             ConflictException => 409,
-            DomainException => 400,
+            DomainException => 409,
+            Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException => 409,
+            Microsoft.EntityFrameworkCore.DbUpdateException
+            {
+                InnerException: Npgsql.PostgresException { SqlState: "23505" }
+            } => 409,
             _ => 500,
         };
         if (status == 500)
@@ -34,9 +47,11 @@ public sealed class ApiExceptionHandler : IExceptionHandler
                 title: status == 404 ? "Resource not found"
                     : status == 409 ? "Conflict"
                     : "Business rule violation",
-                detail: e.Message
+                detail: exception is Microsoft.EntityFrameworkCore.DbUpdateException
+                    ? "Persistence conflict. Refresh the resource and retry."
+                    : exception.Message
             )
-            .ExecuteAsync(c);
+            .ExecuteAsync(httpContext);
         return true;
     }
 }

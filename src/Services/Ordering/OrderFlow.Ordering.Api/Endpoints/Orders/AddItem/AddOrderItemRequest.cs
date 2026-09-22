@@ -1,21 +1,19 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Ordering.Application.Orders.OrderFeatures;
 
 namespace OrderFlow.Ordering.Api.Endpoints;
 
 public static partial class OrderEndpoints
 {
-    public sealed class AddOrderItemRequest
+    public sealed record AddOrderItemRequest
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; init; }
 
-        public Guid ProductId { get; set; }
+        public Guid ProductId { get; init; }
 
-        public string ProductName { get; set; } = string.Empty;
+        public string ProductName { get; init; } = string.Empty;
 
-        public decimal UnitPrice { get; set; }
+        public decimal UnitPrice { get; init; }
 
-        public int Quantity { get; set; }
+        public int Quantity { get; init; }
     }
 }

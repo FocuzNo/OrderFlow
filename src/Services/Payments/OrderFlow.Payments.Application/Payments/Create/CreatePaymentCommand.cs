@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,6 +8,10 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed record CreatePaymentCommand(Guid OrderId, decimal Amount, string Method)
-        : ICommand<PaymentResponse>;
+    public sealed record CreatePaymentCommand(
+        Guid OrderId,
+        decimal Amount,
+        string Method,
+        bool SimulateFailure = false
+    ) : ICommand<PaymentResponse>;
 }

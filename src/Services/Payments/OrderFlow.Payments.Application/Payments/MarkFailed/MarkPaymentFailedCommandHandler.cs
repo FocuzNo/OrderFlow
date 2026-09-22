@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,14 +8,19 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed class MarkPaymentFailedCommandHandler(IPaymentRepository r)
-        : IRequestHandler<MarkPaymentFailedCommand>
+    public sealed class MarkPaymentFailedCommandHandler(
+        IPaymentRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<MarkPaymentFailedCommand>
     {
-        public async Task Handle(MarkPaymentFailedCommand c, CancellationToken ct)
+        public async Task Handle(
+            MarkPaymentFailedCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.PaymentId, ct);
-            x.Fail(c.Reason);
-            await r.SaveAsync(ct);
+            var entity = await Find(repository, command.PaymentId, cancellationToken);
+            entity.Fail(command.Reason);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 }

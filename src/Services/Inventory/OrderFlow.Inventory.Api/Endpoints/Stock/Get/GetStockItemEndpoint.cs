@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Inventory.Application.Inventory.InventoryFeatures;
 
 namespace OrderFlow.Inventory.Api.Endpoints;
 
 public static partial class InventoryEndpoints
 {
-    public sealed class GetStockItemEndpoint(ISender s)
+    public sealed class GetStockItemEndpoint(ISender sender)
         : Endpoint<GetStockItemRequest, F.StockResponse>
     {
         public override void Configure()
@@ -15,10 +13,16 @@ public static partial class InventoryEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(GetStockItemRequest r, CancellationToken ct) =>
+        public override async Task HandleAsync(
+            GetStockItemRequest request,
+            CancellationToken cancellationToken
+        ) =>
             await Send.OkAsync(
-                await s.Send(new F.GetStockItemQuery(r.ProductId, r.WarehouseId), ct),
-                ct
+                await sender.Send(
+                    new F.GetStockItemQuery(request.ProductId, request.WarehouseId),
+                    cancellationToken
+                ),
+                cancellationToken
             );
     }
 }
