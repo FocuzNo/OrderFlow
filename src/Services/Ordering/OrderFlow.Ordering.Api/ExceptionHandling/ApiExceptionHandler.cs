@@ -13,11 +13,12 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         CancellationToken cancellationToken
     )
     {
-        if (exception is ValidationException v)
+        if (exception is ValidationException validationException)
         {
             await Results
                 .ValidationProblem(
-                    v.Errors.GroupBy(candidate => candidate.PropertyName)
+                    validationException
+                        .Errors.GroupBy(candidate => candidate.PropertyName)
                         .ToDictionary(
                             candidate => candidate.Key,
                             candidate => candidate.Select(failure => failure.ErrorMessage).ToArray()
@@ -30,7 +31,12 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         {
             NotFoundException => 404,
             ConflictException => 409,
-            DomainException => 400,
+            DomainException => 409,
+            Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException => 409,
+            Microsoft.EntityFrameworkCore.DbUpdateException
+            {
+                InnerException: Npgsql.PostgresException { SqlState: "23505" }
+            } => 409,
             _ => 500,
         };
         if (status == 500)
@@ -41,7 +47,9 @@ public sealed class ApiExceptionHandler : IExceptionHandler
                 title: status == 404 ? "Resource not found"
                     : status == 409 ? "Conflict"
                     : "Business rule violation",
-                detail: exception.Message
+                detail: exception is Microsoft.EntityFrameworkCore.DbUpdateException
+                    ? "Persistence conflict. Refresh the resource and retry."
+                    : exception.Message
             )
             .ExecuteAsync(httpContext);
         return true;

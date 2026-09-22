@@ -8,6 +8,30 @@ public sealed class NotificationRepository(NotificationsDbContext databaseContex
     : Repository<Notification>(databaseContext),
         INotificationRepository
 {
+    public async Task<IReadOnlyList<Notification>> GetByOrderAsync(
+        Guid orderId,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
+            .Notifications.AsNoTracking()
+            .Include(notification => notification.Attempts)
+            .Where(notification => notification.OrderId == orderId)
+            .OrderBy(notification => notification.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<Notification>> ListAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
+            .Notifications.AsNoTracking()
+            .Include(notification => notification.Attempts)
+            .OrderBy(entity => entity.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
     public Task<Notification?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         DatabaseContext
             .Notifications.Include(candidate => candidate.Attempts)

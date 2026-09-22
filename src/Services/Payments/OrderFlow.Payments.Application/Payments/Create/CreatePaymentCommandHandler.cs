@@ -25,6 +25,11 @@ public static partial class PaymentFeatures
                 command.Amount,
                 PaymentMethod.FromName(command.Method, true)
             );
+            entity.StartProcessing();
+            if (command.SimulateFailure)
+                entity.Fail("Simulated payment failure.");
+            else
+                entity.Succeed($"SIM-{entity.Id:N}");
             await repository.AddAsync(entity, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return Map(entity);

@@ -9,7 +9,7 @@ public static partial class CatalogEndpoints
     {
         public override void Configure()
         {
-            Delete("/api/products/{id}");
+            Post("/api/products/{id}/archive");
             AllowAnonymous();
         }
 

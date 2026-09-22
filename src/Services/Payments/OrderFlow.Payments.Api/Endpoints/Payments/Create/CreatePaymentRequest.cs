@@ -6,6 +6,8 @@ public static partial class PaymentEndpoints
 {
     public sealed record CreatePaymentRequest
     {
+        public bool SimulateFailure { get; init; }
+
         public Guid OrderId { get; init; }
 
         public decimal Amount { get; init; }

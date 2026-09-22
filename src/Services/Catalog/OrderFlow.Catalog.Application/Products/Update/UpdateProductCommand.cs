@@ -11,6 +11,7 @@ public static partial class ProductFeatures
         Guid Id,
         string Name,
         string? Description,
-        Guid CategoryId
+        Guid CategoryId,
+        decimal Price
     ) : ICommand<ProductResponse>;
 }

@@ -19,6 +19,9 @@ public static partial class NotificationFeatures
     private static NotificationResponse Map(Notification entity) =>
         new(
             entity.Id,
+            entity.OrderId,
+            entity.CustomerId,
+            entity.NotificationType,
             entity.Recipient,
             entity.Subject,
             entity.Body,

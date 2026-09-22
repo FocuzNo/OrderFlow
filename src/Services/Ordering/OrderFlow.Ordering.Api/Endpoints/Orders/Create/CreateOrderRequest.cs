@@ -6,6 +6,8 @@ public static partial class OrderEndpoints
 {
     public sealed record CreateOrderRequest
     {
+        public IReadOnlyList<CreateOrderItemRequest> Items { get; init; } = [];
+
         public Guid CustomerId { get; init; }
 
         public string CustomerEmail { get; init; } = string.Empty;

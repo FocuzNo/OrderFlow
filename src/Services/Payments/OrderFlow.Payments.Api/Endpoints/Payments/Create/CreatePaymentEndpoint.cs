@@ -19,7 +19,12 @@ public static partial class PaymentEndpoints
         ) =>
             await Send.ResponseAsync(
                 await sender.Send(
-                    new F.CreatePaymentCommand(request.OrderId, request.Amount, request.Method),
+                    new F.CreatePaymentCommand(
+                        request.OrderId,
+                        request.Amount,
+                        request.Method,
+                        request.SimulateFailure
+                    ),
                     cancellationToken
                 ),
                 201,

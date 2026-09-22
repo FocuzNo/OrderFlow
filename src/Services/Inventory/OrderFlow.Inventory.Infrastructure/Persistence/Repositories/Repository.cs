@@ -7,6 +7,8 @@ public abstract class Repository<TEntity>(InventoryDbContext databaseContext) : 
 {
     protected InventoryDbContext DatabaseContext { get; } = databaseContext;
 
+    public void Remove(TEntity entity) => DatabaseContext.Set<TEntity>().Remove(entity);
+
     public async Task AddAsync(TEntity entity, CancellationToken cancellationToken)
     {
         await DatabaseContext.Set<TEntity>().AddAsync(entity, cancellationToken);

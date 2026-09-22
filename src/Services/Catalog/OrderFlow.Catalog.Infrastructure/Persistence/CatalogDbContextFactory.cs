@@ -6,13 +6,16 @@ public sealed class CatalogDbContextFactory : IDesignTimeDbContextFactory<Catalo
 {
     public CatalogDbContext CreateDbContext(string[] args)
     {
-        var options = new DbContextOptionsBuilder<CatalogDbContext>()
-            .UseNpgsql(
-                "Host=localhost;Database=orderflow_catalog;Username=postgres;Password=postgres"
-            )
-            .UseSnakeCaseNamingConvention()
-            .Options;
-
-        return new CatalogDbContext(options);
+        var connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__CatalogDatabase")
+            ?? throw new InvalidOperationException(
+                "Set ConnectionStrings__CatalogDatabase for EF tooling."
+            );
+        return new CatalogDbContext(
+            new DbContextOptionsBuilder<CatalogDbContext>()
+                .UseNpgsql(connectionString)
+                .UseSnakeCaseNamingConvention()
+                .Options
+        );
     }
 }

@@ -23,7 +23,21 @@ public static partial class OrderFeatures
                 command.ShippingAddress.PostalCode,
                 command.ShippingAddress.Country
             );
-            var entity = Order.Create(command.CustomerId, command.CustomerEmail, shippingAddress);
+            var entity = Order.Create(
+                command.CustomerId,
+                command.CustomerEmail,
+                shippingAddress,
+                command
+                    .Items.Select(item =>
+                        OrderItem.Create(
+                            item.ProductId,
+                            item.ProductName,
+                            item.UnitPrice,
+                            item.Quantity
+                        )
+                    )
+                    .ToArray()
+            );
             await repository.AddAsync(entity, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return Map(entity);

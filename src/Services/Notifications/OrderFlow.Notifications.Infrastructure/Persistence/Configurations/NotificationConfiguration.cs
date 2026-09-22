@@ -7,6 +7,8 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
     public void Configure(EntityTypeBuilder<Notification> builder)
     {
         builder.ToTable("notifications");
+        builder.Property(notification => notification.NotificationType).HasMaxLength(100);
+        builder.HasIndex(notification => notification.OrderId);
         builder.HasKey(candidate => candidate.Id);
         builder.Property(candidate => candidate.Recipient).HasMaxLength(320);
         builder.Property(candidate => candidate.Subject).HasMaxLength(250);
@@ -23,7 +25,6 @@ public sealed class NotificationConfiguration : IEntityTypeConfiguration<Notific
                 candidate => candidate.Value,
                 candidate => NotificationStatus.FromValue(candidate)
             );
-        builder.Ignore(candidate => candidate.DomainEvents);
         builder.HasMany(candidate => candidate.Attempts).WithOne().HasForeignKey("NotificationId");
         builder.HasIndex(candidate => new { candidate.Recipient, candidate.CreatedAt });
     }

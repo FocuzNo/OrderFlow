@@ -9,7 +9,7 @@ public static partial class NotificationEndpoints
     {
         public override void Configure()
         {
-            Get("/api/notifications");
+            Get("/api/notifications/by-recipient");
             AllowAnonymous();
         }
 

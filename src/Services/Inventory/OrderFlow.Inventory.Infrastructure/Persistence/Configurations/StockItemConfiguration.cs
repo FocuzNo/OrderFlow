@@ -9,10 +9,7 @@ public sealed class StockItemConfiguration : IEntityTypeConfiguration<StockItem>
         builder.ToTable("stock_items");
         builder.HasKey(candidate => candidate.Id);
         builder.Property(candidate => candidate.Sku).HasMaxLength(64);
-        builder
-            .HasIndex(candidate => new { candidate.ProductId, candidate.WarehouseId })
-            .IsUnique();
-        builder.Ignore(candidate => candidate.DomainEvents);
+        builder.HasIndex(candidate => candidate.ProductId).IsUnique();
         builder.Ignore(candidate => candidate.AvailableQuantity);
         builder
             .HasMany(candidate => candidate.Reservations)

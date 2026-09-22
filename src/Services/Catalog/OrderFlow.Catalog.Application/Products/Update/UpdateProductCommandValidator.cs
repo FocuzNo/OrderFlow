@@ -8,6 +8,7 @@ public static partial class ProductFeatures
     {
         public UpdateProductCommandValidator()
         {
+            RuleFor(command => command.Price).GreaterThanOrEqualTo(0);
             RuleFor(candidate => candidate.Id).NotEmpty();
             RuleFor(candidate => candidate.Name).NotEmpty().MaximumLength(Product.MaxNameLength);
             RuleFor(candidate => candidate.Description).MaximumLength(Product.MaxDescriptionLength);

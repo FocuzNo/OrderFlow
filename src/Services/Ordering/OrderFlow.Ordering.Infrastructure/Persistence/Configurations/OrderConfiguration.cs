@@ -21,7 +21,6 @@ public sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
                 candidate => candidate.Value,
                 candidate => OrderStatus.FromValue(candidate)
             );
-        builder.Ignore(candidate => candidate.DomainEvents);
         builder.Ignore(candidate => candidate.TotalAmount);
         builder.OwnsOne(
             candidate => candidate.ShippingAddress,

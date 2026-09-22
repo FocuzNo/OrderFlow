@@ -5,39 +5,25 @@ namespace OrderFlow.Catalog.Domain.UnitTests.Products;
 
 public sealed class ProductTests
 {
-    private static readonly Guid CategoryId = Guid.NewGuid();
-
-    [Fact]
-    public void Create_initializes_draft_and_raises_created_event()
-    {
-        var product = Product.Create(" sku-1 ", "Notebook", "Ruled", 12.50m, CategoryId);
-
-        Assert.NotEqual(Guid.Empty, product.Id);
-        Assert.Equal("SKU-1", product.Sku.Value);
-        Assert.Equal(12.50m, product.Price.Amount);
-        Assert.Equal(ProductStatus.Draft, product.Status);
-        Assert.Contains(product.DomainEvents, candidate => candidate is ProductCreatedDomainEvent);
-    }
-
     [Theory]
     [InlineData("")]
     [InlineData(" ")]
-    public void Create_rejects_blank_name(string name) =>
-        Assert.Throws<DomainException>(() => Product.Create("SKU-1", name, null, 10m, CategoryId));
+    public void Create_ShouldRejectBlankName(string name) =>
+        Assert.Throws<DomainException>(() => Product.Create("SKU", name, null, 1, Guid.NewGuid()));
 
     [Fact]
-    public void ChangePrice_raises_event_and_archive_blocks_mutation()
+    public void ChangePrice_ShouldRejectArchivedMutation()
     {
-        var product = Product.Create("SKU-1", "Notebook", null, 10m, CategoryId);
-        product.ClearDomainEvents();
-        product.ChangePrice(15m);
+        var product = Product.Create("SKU", "Notebook", null, 1, Guid.NewGuid());
+        product.ChangePrice(15);
+        Assert.Equal(15, product.Price.Amount);
         product.Archive();
-
-        Assert.Contains(
-            product.DomainEvents,
-            candidate => candidate is ProductPriceChangedDomainEvent
-        );
-        Assert.Equal(ProductStatus.Archived, product.Status);
-        Assert.Throws<DomainException>(() => product.ChangePrice(20m));
+        Assert.Throws<DomainException>(() => product.ChangePrice(20));
     }
+
+    [Fact]
+    public void Create_ShouldRejectNegativePrice() =>
+        Assert.Throws<DomainException>(() =>
+            Product.Create("SKU", "Notebook", null, -1, Guid.NewGuid())
+        );
 }

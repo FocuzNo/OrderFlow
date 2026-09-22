@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
-using OrderFlow.Catalog.Infrastructure.Messaging;
 using OrderFlow.Catalog.Infrastructure.Persistence;
 using OrderFlow.Catalog.Infrastructure.Persistence.Repositories;
 
@@ -20,20 +19,6 @@ public static class DependencyInjection
                 "ConnectionStrings:CatalogDatabase is required."
             );
 
-        services
-            .AddOptions<KafkaOptions>()
-            .Bind(configuration.GetSection(KafkaOptions.SectionName))
-            .Validate(
-                options => !string.IsNullOrWhiteSpace(options.BootstrapServers),
-                "Kafka:BootstrapServers is required."
-            )
-            .Validate(options => options.MaxRetries > 0, "Kafka:MaxRetries must be positive.")
-            .Validate(
-                options => options.OutboxBatchSize > 0,
-                "Kafka:OutboxBatchSize must be positive."
-            )
-            .ValidateOnStart();
-
         services.AddDbContext<CatalogDbContext>(options =>
             options.UseNpgsql(connectionString).UseSnakeCaseNamingConvention()
         );
@@ -42,9 +27,6 @@ public static class DependencyInjection
         );
         services.AddScoped<IProductRepository, ProductRepository>();
         services.AddScoped<ICategoryRepository, CategoryRepository>();
-        services.AddSingleton<IKafkaPublisher, KafkaPublisher>();
-        services.AddHostedService<OutboxProcessor>();
-        services.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
 
         return services;
     }

@@ -9,6 +9,9 @@ namespace OrderFlow.Notifications.Application.Notifications;
 public static partial class NotificationFeatures
 {
     public sealed record CreateNotificationCommand(
+        Guid OrderId,
+        Guid CustomerId,
+        string NotificationType,
         string Recipient,
         string Subject,
         string Body,

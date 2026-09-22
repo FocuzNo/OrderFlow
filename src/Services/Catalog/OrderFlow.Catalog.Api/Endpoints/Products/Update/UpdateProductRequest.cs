@@ -7,6 +7,8 @@ public static partial class CatalogEndpoints
 {
     public sealed record UpdateProductRequest
     {
+        public decimal Price { get; init; }
+
         public Guid Id { get; init; }
 
         public string Name { get; init; } = string.Empty;

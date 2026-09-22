@@ -6,6 +6,12 @@ public static partial class NotificationEndpoints
 {
     public sealed record CreateNotificationRequest
     {
+        public Guid OrderId { get; init; }
+
+        public Guid CustomerId { get; init; }
+
+        public string NotificationType { get; init; } = string.Empty;
+
         public string Recipient { get; init; } = string.Empty;
 
         public string Subject { get; init; } = string.Empty;

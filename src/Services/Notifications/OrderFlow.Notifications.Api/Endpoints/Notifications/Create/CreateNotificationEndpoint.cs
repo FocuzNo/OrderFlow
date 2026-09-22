@@ -20,6 +20,9 @@ public static partial class NotificationEndpoints
             await Send.ResponseAsync(
                 await sender.Send(
                     new F.CreateNotificationCommand(
+                        request.OrderId,
+                        request.CustomerId,
+                        request.NotificationType,
                         request.Recipient,
                         request.Subject,
                         request.Body,

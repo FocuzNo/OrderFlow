@@ -9,7 +9,7 @@ public static partial class PaymentEndpoints
     {
         public override void Configure()
         {
-            Get("/api/orders/{id}/payment");
+            Get("/api/payments/order/{id}");
             AllowAnonymous();
         }
 

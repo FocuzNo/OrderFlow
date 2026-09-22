@@ -108,6 +108,8 @@ public sealed class CreateProductTests
 
     private sealed class ProductRepository : IProductRepository
     {
+        public void Remove(Product product) => Entity = null;
+
         public Product? Entity { get; private set; }
 
         public Task AddAsync(Product product, CancellationToken cancellationToken)
@@ -136,6 +138,8 @@ public sealed class CreateProductTests
 
     private sealed class CategoryRepository(Category category) : ICategoryRepository
     {
+        public void Remove(Category value) { }
+
         public Task AddAsync(Category value, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 

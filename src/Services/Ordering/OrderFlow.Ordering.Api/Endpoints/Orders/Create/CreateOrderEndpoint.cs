@@ -22,7 +22,19 @@ public static partial class OrderEndpoints
                     new F.CreateOrderCommand(
                         request.CustomerId,
                         request.CustomerEmail,
-                        new(request.Line1, request.City, request.PostalCode, request.Country)
+                        new(request.Line1, request.City, request.PostalCode, request.Country),
+                        (request.Items ?? [])
+                            .Select(item =>
+                                item is null
+                                    ? null!
+                                    : new F.OrderItemInput(
+                                        item.ProductId,
+                                        item.ProductName,
+                                        item.UnitPrice,
+                                        item.Quantity
+                                    )
+                            )
+                            .ToArray()
                     ),
                     cancellationToken
                 ),

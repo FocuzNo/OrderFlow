@@ -43,17 +43,28 @@ public sealed class Order : AggregateRoot
 
     public uint Version { get; private set; }
 
-    public static Order Create(Guid customerId, string email, ShippingAddress address)
+    public static Order Create(
+        Guid customerId,
+        string email,
+        ShippingAddress address,
+        IReadOnlyList<OrderItem> items
+    )
     {
         if (customerId == Guid.Empty)
             throw new DomainException("Customer is required.");
-        return new Order(
+        if (address is null || items is null || items.Count == 0 || items.Any(item => item is null))
+            throw new DomainException("Shipping address and at least one order item are required.");
+        var order = new Order(
             Guid.NewGuid(),
             customerId,
             EmailAddress.Create(email),
             address,
             DateTimeOffset.UtcNow
         );
+        foreach (var item in items)
+            order.AddItem(item.ProductId, item.ProductName, item.UnitPrice, item.Quantity);
+        order.Submit();
+        return order;
     }
 
     public void AddItem(Guid productId, string productName, decimal unitPrice, int quantity)
@@ -90,50 +101,30 @@ public sealed class Order : AggregateRoot
             throw new DomainException("An order must contain at least one item.");
         Status = OrderStatus.PendingInventory;
         Touch();
-        Raise(
-            new OrderSubmittedDomainEvent(
-                Guid.NewGuid(),
-                UpdatedAt,
-                Id,
-                CustomerId,
-                CustomerEmail.Value,
-                _items
-                    .Select(candidate => new OrderItemSnapshot(
-                        candidate.ProductId,
-                        candidate.ProductName,
-                        candidate.UnitPrice,
-                        candidate.Quantity
-                    ))
-                    .ToArray(),
-                TotalAmount
-            )
-        );
     }
 
     public void MarkInventoryReserved()
     {
         if (Status != OrderStatus.PendingInventory)
             throw new DomainException("Order is not awaiting inventory.");
-        Status = OrderStatus.PendingPayment;
+        Status = OrderStatus.InventoryReserved;
         Touch();
-        Raise(new PaymentRequestedDomainEvent(Guid.NewGuid(), UpdatedAt, Id, TotalAmount));
     }
 
-    public void ConfirmPayment()
+    public void MarkPaymentProcessing()
+    {
+        if (Status != OrderStatus.InventoryReserved)
+            throw new DomainException("Inventory must be reserved before processing payment.");
+        Status = OrderStatus.PendingPayment;
+        Touch();
+    }
+
+    public void Confirm()
     {
         if (Status != OrderStatus.PendingPayment)
             throw new DomainException("Order is not awaiting payment.");
         Status = OrderStatus.Confirmed;
         Touch();
-        Raise(
-            new OrderConfirmedDomainEvent(
-                Guid.NewGuid(),
-                UpdatedAt,
-                Id,
-                CustomerId,
-                CustomerEmail.Value
-            )
-        );
     }
 
     public void Cancel(string reason)
@@ -144,15 +135,6 @@ public sealed class Order : AggregateRoot
             throw new DomainException("Cancellation reason is required.");
         Status = OrderStatus.Cancelled;
         Touch();
-        Raise(
-            new OrderCancelledDomainEvent(
-                Guid.NewGuid(),
-                UpdatedAt,
-                Id,
-                CustomerEmail.Value,
-                reason.Trim()
-            )
-        );
     }
 
     private void EnsureDraft()

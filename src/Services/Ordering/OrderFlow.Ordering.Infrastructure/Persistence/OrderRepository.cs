@@ -8,6 +8,19 @@ public sealed class OrderRepository(OrderingDbContext databaseContext)
     : Repository<Order>(databaseContext),
         IOrderRepository
 {
+    public async Task<IReadOnlyList<Order>> ListAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
+            .Orders.AsNoTracking()
+            .Include(order => order.Items)
+            .OrderBy(entity => entity.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
     public Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
         DatabaseContext
             .Orders.Include(candidate => candidate.Items)

@@ -22,6 +22,7 @@ public static partial class ProductFeatures
             if (await categories.GetByIdAsync(command.CategoryId, cancellationToken) is null)
                 throw new NotFoundException("Category was not found.");
             product.Update(command.Name, command.Description, command.CategoryId);
+            product.ChangePrice(command.Price);
             await unitOfWork.SaveChangesAsync(cancellationToken);
             return ProductResponse.From(product);
         }

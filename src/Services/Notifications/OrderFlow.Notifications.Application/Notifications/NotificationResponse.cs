@@ -10,6 +10,9 @@ public static partial class NotificationFeatures
 {
     public sealed record NotificationResponse(
         Guid Id,
+        Guid OrderId,
+        Guid CustomerId,
+        string NotificationType,
         string Recipient,
         string Subject,
         string Body,

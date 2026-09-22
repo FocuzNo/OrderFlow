@@ -37,7 +37,7 @@ builder
         tracingBuilder
             .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql", "OrderFlow.Ordering.Kafka")
+            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql")
             .AddOtlpExporter()
     )
     .WithMetrics(metricsBuilder =>

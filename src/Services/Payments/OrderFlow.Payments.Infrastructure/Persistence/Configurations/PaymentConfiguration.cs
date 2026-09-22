@@ -24,7 +24,6 @@ public sealed class PaymentConfiguration : IEntityTypeConfiguration<Payment>
         builder.Property(candidate => candidate.ProviderReference).HasMaxLength(200);
         builder.Property(candidate => candidate.FailureReason).HasMaxLength(1000);
         builder.HasIndex(candidate => candidate.OrderId).IsUnique();
-        builder.Ignore(candidate => candidate.DomainEvents);
         builder.HasMany(candidate => candidate.Refunds).WithOne().HasForeignKey("PaymentId");
     }
 }

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;
@@ -10,7 +11,8 @@ public static partial class NotificationFeatures
 {
     public sealed class CreateNotificationCommandHandler(
         INotificationRepository repository,
-        IUnitOfWork unitOfWork
+        IUnitOfWork unitOfWork,
+        ILogger<CreateNotificationCommandHandler> logger
     ) : IRequestHandler<CreateNotificationCommand, NotificationResponse>
     {
         public async Task<NotificationResponse> Handle(
@@ -19,6 +21,9 @@ public static partial class NotificationFeatures
         )
         {
             var entity = Notification.Create(
+                command.OrderId,
+                command.CustomerId,
+                command.NotificationType,
                 command.Recipient,
                 command.Subject,
                 command.Body,
@@ -26,6 +31,11 @@ public static partial class NotificationFeatures
             );
             await repository.AddAsync(entity, cancellationToken);
             await unitOfWork.SaveChangesAsync(cancellationToken);
+            logger.LogInformation(
+                "Recorded notification {NotificationId} for order {OrderId}",
+                entity.Id,
+                entity.OrderId
+            );
             return Map(entity);
         }
     }

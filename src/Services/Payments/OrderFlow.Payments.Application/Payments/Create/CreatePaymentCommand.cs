@@ -8,6 +8,10 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed record CreatePaymentCommand(Guid OrderId, decimal Amount, string Method)
-        : ICommand<PaymentResponse>;
+    public sealed record CreatePaymentCommand(
+        Guid OrderId,
+        decimal Amount,
+        string Method,
+        bool SimulateFailure = false
+    ) : ICommand<PaymentResponse>;
 }

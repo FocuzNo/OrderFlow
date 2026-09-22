@@ -10,6 +10,7 @@ public static partial class OrderFeatures
     public sealed record CreateOrderCommand(
         Guid CustomerId,
         string CustomerEmail,
-        ShippingAddressInput ShippingAddress
+        ShippingAddressInput ShippingAddress,
+        IReadOnlyList<OrderItemInput> Items
     ) : ICommand<OrderResponse>;
 }

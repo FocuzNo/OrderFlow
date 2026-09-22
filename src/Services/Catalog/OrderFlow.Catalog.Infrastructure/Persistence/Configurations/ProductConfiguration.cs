@@ -28,7 +28,6 @@ public sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
                 candidate => ProductStatus.FromValue(candidate)
             );
         builder.HasIndex(candidate => candidate.CategoryId);
-        builder.Ignore(candidate => candidate.DomainEvents);
         builder.Property(candidate => candidate.Version).IsRowVersion();
     }
 }

@@ -24,7 +24,8 @@ public static partial class CatalogEndpoints
                         request.Id,
                         request.Name,
                         request.Description,
-                        request.CategoryId
+                        request.CategoryId,
+                        request.Price
                     ),
                     cancellationToken
                 ),
