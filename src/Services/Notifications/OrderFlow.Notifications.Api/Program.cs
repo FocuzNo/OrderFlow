@@ -10,6 +10,7 @@ using OrderFlow.Notifications.Application;
 using OrderFlow.Notifications.Infrastructure;
 using OrderFlow.Notifications.Infrastructure.Persistence;
 using Serilog;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSerilog(
@@ -60,6 +61,7 @@ app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseFastEndpoints();
 app.MapOpenApi();
+app.MapScalarApiReference("/scalar");
 app.MapHealthChecks(
     "/health/live",
     new HealthCheckOptions { Predicate = candidate => candidate.Tags.Contains("live") }

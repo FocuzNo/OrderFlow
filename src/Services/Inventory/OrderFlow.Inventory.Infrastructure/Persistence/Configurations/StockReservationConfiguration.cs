@@ -8,6 +8,7 @@ public sealed class StockReservationConfiguration : IEntityTypeConfiguration<Sto
     {
         builder.ToTable("stock_reservations");
         builder.HasKey(candidate => candidate.Id);
+        builder.Property(candidate => candidate.Id).ValueGeneratedNever();
         builder
             .Property(candidate => candidate.Status)
             .HasConversion(

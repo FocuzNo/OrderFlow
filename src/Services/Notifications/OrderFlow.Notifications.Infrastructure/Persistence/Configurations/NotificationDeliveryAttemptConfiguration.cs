@@ -9,6 +9,7 @@ public sealed class NotificationDeliveryAttemptConfiguration
     {
         builder.ToTable("notification_delivery_attempts");
         builder.HasKey(candidate => candidate.Id);
+        builder.Property(candidate => candidate.Id).ValueGeneratedNever();
         builder.Property(candidate => candidate.Error).HasMaxLength(2000);
     }
 }

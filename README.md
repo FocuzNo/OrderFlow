@@ -20,7 +20,15 @@ Services use Serilog request logging, correlation IDs, centralized ProblemDetail
 | Payments | 5004 | 5436 | GET/POST /api/payments; GET /api/payments/{id}; GET /api/payments/order/{id}; refunds |
 | Notifications | 5005 | 5437 | GET/POST /api/notifications; GET /api/notifications/{id}; GET /api/notifications/order/{orderId} |
 
-All services expose GET /health/live, GET /health/ready and /openapi/v1.json. Liveness checks the process; readiness checks only the service's own PostgreSQL connection.
+All services expose GET /health/live, GET /health/ready and /openapi/v1.json. Each API also includes an interactive Scalar UI at /scalar, where you can inspect the contract and execute requests against the running service. Liveness checks the process; readiness checks only the service's own PostgreSQL connection.
+
+Scalar URLs:
+
+- Catalog: http://localhost:5001/scalar
+- Inventory: http://localhost:5002/scalar
+- Ordering: http://localhost:5003/scalar
+- Payments: http://localhost:5004/scalar
+- Notifications: http://localhost:5005/scalar
 
 Lists use Page (default 1) and PageSize (default 20, maximum 100). Existing recipient/customer-specific history queries are also retained.
 
