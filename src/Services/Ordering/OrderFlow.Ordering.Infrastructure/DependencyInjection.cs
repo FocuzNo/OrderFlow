@@ -39,8 +39,8 @@ public static class DependencyInjection
         );
         services.AddScoped<IOrderRepository, OrderRepository>();
         services.AddSingleton<IKafkaPublisher, KafkaPublisher>();
-        services.AddHostedService<OutboxProcessor>();
-        services.AddHostedService<WorkflowConsumer>();
+        // services.AddHostedService<OutboxProcessor>();
+        // services.AddHostedService<WorkflowConsumer>();
         services.AddHealthChecks().AddCheck<KafkaHealthCheck>("kafka", tags: ["ready"]);
 
         return services;

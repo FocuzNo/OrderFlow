@@ -1,5 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
+    <ProjectReference Include="..\..\..\..\OrderFlow.IntegrationEvents\OrderFlow.IntegrationEvents.csproj" />
     <ProjectReference Include="..\OrderFlow.Ordering.Application\OrderFlow.Ordering.Application.csproj" />
     <ProjectReference Include="..\OrderFlow.Ordering.Domain\OrderFlow.Ordering.Domain.csproj" />
     <ProjectReference Include="..\..\..\BuildingBlocks\OrderFlow.IntegrationContracts\OrderFlow.IntegrationContracts.csproj" />
