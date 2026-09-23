@@ -2,11 +2,9 @@
   <ItemGroup>
     <ProjectReference Include="..\OrderFlow.Notifications.Application\OrderFlow.Notifications.Application.csproj" />
     <ProjectReference Include="..\OrderFlow.Notifications.Domain\OrderFlow.Notifications.Domain.csproj" />
-    <ProjectReference Include="..\..\..\BuildingBlocks\OrderFlow.IntegrationContracts\OrderFlow.IntegrationContracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Confluent.Kafka" Version="2.15.1" />
     <PackageReference Include="EFCore.NamingConventions" Version="10.0.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.12" />

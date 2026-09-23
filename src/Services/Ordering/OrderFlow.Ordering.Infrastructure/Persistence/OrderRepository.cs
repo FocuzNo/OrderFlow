@@ -1,27 +1,39 @@
-using Microsoft.EntityFrameworkCore;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
 using OrderFlow.Ordering.Domain.Orders;
+using OrderFlow.Ordering.Infrastructure.Persistence.Repositories;
 
 namespace OrderFlow.Ordering.Infrastructure.Persistence;
 
-public sealed class OrderRepository(OrderingDbContext db) : IOrderRepository
+public sealed class OrderRepository(OrderingDbContext databaseContext)
+    : Repository<Order>(databaseContext),
+        IOrderRepository
 {
-    public Task<Order?> GetAsync(Guid id, CancellationToken ct) =>
-        db.Orders.Include(x => x.Items).SingleOrDefaultAsync(x => x.Id == id, ct);
-
-    public async Task<IReadOnlyList<Order>> GetCustomerOrdersAsync(Guid id, CancellationToken ct) =>
-        await db
+    public async Task<IReadOnlyList<Order>> ListAsync(
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
             .Orders.AsNoTracking()
-            .Include(x => x.Items)
-            .Where(x => x.CustomerId == id)
-            .OrderByDescending(x => x.CreatedAt)
-            .ToListAsync(ct);
+            .Include(order => order.Items)
+            .OrderBy(entity => entity.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
 
-    public async Task AddAsync(Order x, CancellationToken ct)
-    {
-        db.Orders.Add(x);
-        await db.SaveChangesAsync(ct);
-    }
+    public Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        DatabaseContext
+            .Orders.Include(candidate => candidate.Items)
+            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
 
-    public async Task SaveAsync(CancellationToken ct) => await db.SaveChangesAsync(ct);
+    public async Task<IReadOnlyList<Order>> GetCustomerOrdersAsync(
+        Guid id,
+        CancellationToken cancellationToken
+    ) =>
+        await DatabaseContext
+            .Orders.AsNoTracking()
+            .Include(candidate => candidate.Items)
+            .Where(candidate => candidate.CustomerId == id)
+            .OrderByDescending(candidate => candidate.CreatedAt)
+            .ToListAsync(cancellationToken);
 }

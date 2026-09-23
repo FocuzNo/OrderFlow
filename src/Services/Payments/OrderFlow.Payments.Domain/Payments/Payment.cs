@@ -39,7 +39,7 @@ public sealed class Payment : AggregateRoot
 
     public static Payment Create(Guid orderId, decimal amount, PaymentMethod method)
     {
-        if (orderId == Guid.Empty || amount <= 0)
+        if (orderId == Guid.Empty || decimal.Round(amount, 2) <= 0 || method is null)
             throw new DomainException("Order and positive payment amount are required.");
         return new Payment(Guid.NewGuid(), orderId, decimal.Round(amount, 2), method);
     }
@@ -50,7 +50,6 @@ public sealed class Payment : AggregateRoot
             throw new DomainException("Only pending payments can be processed.");
         Status = PaymentStatus.Processing;
         Touch();
-        Raise(new PaymentRequestedDomainEvent(Guid.NewGuid(), UpdatedAt, Id, OrderId, Amount));
     }
 
     public void Succeed(string reference)
@@ -62,7 +61,6 @@ public sealed class Payment : AggregateRoot
         ProviderReference = reference.Trim();
         Status = PaymentStatus.Succeeded;
         Touch();
-        Raise(new PaymentSucceededDomainEvent(Guid.NewGuid(), UpdatedAt, Id, OrderId, Amount));
     }
 
     public void Fail(string reason)
@@ -74,18 +72,17 @@ public sealed class Payment : AggregateRoot
             : reason.Trim();
         Status = PaymentStatus.Failed;
         Touch();
-        Raise(new PaymentFailedDomainEvent(Guid.NewGuid(), UpdatedAt, Id, OrderId, FailureReason));
     }
 
     public Refund Refund(decimal amount, string reason)
     {
         if (Status != PaymentStatus.Succeeded)
             throw new DomainException("Only successful payments can be refunded.");
-        if (_refunds.Sum(x => x.Amount) + amount > Amount)
+        if (_refunds.Sum(candidate => candidate.Amount) + amount > Amount)
             throw new DomainException("Refund exceeds the captured amount.");
         var refund = Payments.Refund.Create(amount, reason);
         _refunds.Add(refund);
-        if (_refunds.Sum(x => x.Amount) == Amount)
+        if (_refunds.Sum(candidate => candidate.Amount) == Amount)
             Status = PaymentStatus.Refunded;
         Touch();
         return refund;

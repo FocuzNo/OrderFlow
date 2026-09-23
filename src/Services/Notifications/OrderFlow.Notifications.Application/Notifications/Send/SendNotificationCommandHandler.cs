@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;
@@ -10,28 +9,34 @@ namespace OrderFlow.Notifications.Application.Notifications;
 public static partial class NotificationFeatures
 {
     public sealed class SendNotificationCommandHandler(
-        INotificationRepository r,
-        IEmailSender sender
+        INotificationRepository repository,
+        IEmailSender sender,
+        IUnitOfWork unitOfWork
     ) : IRequestHandler<SendNotificationCommand, NotificationResponse>
     {
         public async Task<NotificationResponse> Handle(
-            SendNotificationCommand c,
-            CancellationToken ct
+            SendNotificationCommand command,
+            CancellationToken cancellationToken
         )
         {
-            var x = await Find(r, c.Id, ct);
-            x.StartSending();
+            var entity = await Find(repository, command.Id, cancellationToken);
+            entity.StartSending();
             try
             {
-                await sender.SendAsync(x.Recipient, x.Subject, x.Body, ct);
-                x.RecordSuccess();
+                await sender.SendAsync(
+                    entity.Recipient,
+                    entity.Subject,
+                    entity.Body,
+                    cancellationToken
+                );
+                entity.RecordSuccess();
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                x.RecordFailure(ex.Message);
+                entity.RecordFailure(exception.Message);
             }
-            await r.SaveAsync(ct);
-            return Map(x);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

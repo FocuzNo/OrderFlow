@@ -11,6 +11,9 @@ public sealed class Notification : AggregateRoot
 
     private Notification(
         Guid id,
+        Guid orderId,
+        Guid customerId,
+        string notificationType,
         string recipient,
         string subject,
         string body,
@@ -18,6 +21,9 @@ public sealed class Notification : AggregateRoot
     )
         : base(id)
     {
+        OrderId = orderId;
+        CustomerId = customerId;
+        NotificationType = notificationType;
         Recipient = recipient;
         Subject = subject;
         Body = body;
@@ -25,6 +31,12 @@ public sealed class Notification : AggregateRoot
         Status = NotificationStatus.Pending;
         CreatedAt = DateTimeOffset.UtcNow;
     }
+
+    public Guid OrderId { get; private set; }
+
+    public Guid CustomerId { get; private set; }
+
+    public string NotificationType { get; private set; } = string.Empty;
 
     public string Recipient { get; private set; } = string.Empty;
 
@@ -43,15 +55,30 @@ public sealed class Notification : AggregateRoot
     public DateTimeOffset? SentAt { get; private set; }
 
     public static Notification Create(
+        Guid orderId,
+        Guid customerId,
+        string notificationType,
         string recipient,
         string subject,
         string body,
         NotificationChannel channel
     )
     {
+        if (
+            orderId == Guid.Empty
+            || customerId == Guid.Empty
+            || string.IsNullOrWhiteSpace(notificationType)
+            || notificationType.Length > 100
+        )
+            throw new DomainException(
+                "Order, customer and notification type (1-100 characters) are required."
+            );
         Validate(recipient, subject, body);
         return new Notification(
             Guid.NewGuid(),
+            orderId,
+            customerId,
+            notificationType.Trim(),
             new MailAddress(recipient.Trim()).Address,
             subject.Trim(),
             body.Trim(),
@@ -73,7 +100,6 @@ public sealed class Notification : AggregateRoot
         _attempts.Add(NotificationDeliveryAttempt.Create(true, null));
         Status = NotificationStatus.Sent;
         SentAt = DateTimeOffset.UtcNow;
-        Raise(new NotificationSentDomainEvent(Guid.NewGuid(), SentAt.Value, Id, Recipient));
     }
 
     public void RecordFailure(string error)
@@ -88,6 +114,10 @@ public sealed class Notification : AggregateRoot
 
     private static void Validate(string recipient, string subject, string body)
     {
+        if (string.IsNullOrWhiteSpace(recipient) || recipient.Length > 320)
+            throw new DomainException(
+                "Recipient email is required and cannot exceed 320 characters."
+            );
         try
         {
             _ = new MailAddress(recipient);

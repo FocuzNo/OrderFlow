@@ -16,9 +16,11 @@ public sealed class CreateProductTests
     {
         var category = Category.Create("Office", null);
         var products = new ProductRepository();
+        var unitOfWork = new RecordingUnitOfWork();
         var handler = new ProductFeatures.CreateProductCommandHandler(
             products,
-            new CategoryRepository(category)
+            new CategoryRepository(category),
+            unitOfWork
         );
 
         var result = await handler.Handle(
@@ -28,6 +30,7 @@ public sealed class CreateProductTests
 
         Assert.Equal(result.Id, products.Entity?.Id);
         Assert.Equal("SKU-1", result.Sku);
+        Assert.Equal(1, unitOfWork.CommitCount);
     }
 
     [Fact]
@@ -39,6 +42,7 @@ public sealed class CreateProductTests
             .AddLogging()
             .AddApplication()
             .AddSingleton<IProductRepository>(products)
+            .AddSingleton<IUnitOfWork, RecordingUnitOfWork>()
             .AddSingleton<ICategoryRepository>(new CategoryRepository(category))
             .BuildServiceProvider();
 
@@ -50,17 +54,71 @@ public sealed class CreateProductTests
         Assert.Null(products.Entity);
     }
 
+    [Fact]
+    public async Task Create_ShouldNotCommit_WhenCategoryIsMissing()
+    {
+        var products = new ProductRepository();
+        var unitOfWork = new RecordingUnitOfWork();
+        var handler = new ProductFeatures.CreateProductCommandHandler(
+            products,
+            new CategoryRepository(Category.Create("Existing", null)),
+            unitOfWork
+        );
+
+        await Assert.ThrowsAsync<OrderFlow.Catalog.Application.Abstractions.Errors.NotFoundException>(
+            () =>
+                handler.Handle(new("SKU-2", "Notebook", null, 10m, Guid.NewGuid()), default)
+        );
+
+        Assert.Null(products.Entity);
+        Assert.Equal(0, unitOfWork.CommitCount);
+    }
+
+    [Fact]
+    public async Task Create_ShouldPropagateCancellation_ToCommitBoundary()
+    {
+        var category = Category.Create("Office", null);
+        var unitOfWork = new RecordingUnitOfWork();
+        var handler = new ProductFeatures.CreateProductCommandHandler(
+            new ProductRepository(),
+            new CategoryRepository(category),
+            unitOfWork
+        );
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.Handle(new("SKU-3", "Notebook", null, 10m, category.Id), cancellation.Token)
+        );
+
+        Assert.Equal(0, unitOfWork.CommitCount);
+    }
+
+    private sealed class RecordingUnitOfWork : IUnitOfWork
+    {
+        public int CommitCount { get; private set; }
+
+        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            CommitCount++;
+            return Task.FromResult(1);
+        }
+    }
+
     private sealed class ProductRepository : IProductRepository
     {
+        public void Remove(Product product) => Entity = null;
+
         public Product? Entity { get; private set; }
 
-        public Task AddAsync(Product product, CancellationToken ct)
+        public Task AddAsync(Product product, CancellationToken cancellationToken)
         {
             Entity = product;
             return Task.CompletedTask;
         }
 
-        public Task<Product?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        public Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(Entity?.Id == id ? Entity : null);
 
         public Task<IReadOnlyList<Product>> ListAsync(
@@ -68,28 +126,33 @@ public sealed class CreateProductTests
             int pageSize,
             string? search,
             string? sort,
-            CancellationToken ct
+            CancellationToken cancellationToken
         ) => Task.FromResult<IReadOnlyList<Product>>(Entity is null ? [] : [Entity]);
 
-        public Task<bool> SkuExistsAsync(string sku, Guid? excludingId, CancellationToken ct) =>
-            Task.FromResult(Entity?.Sku.Value == sku);
-
-        public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> SkuExistsAsync(
+            string sku,
+            Guid? excludingId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(Entity?.Sku.Value == sku);
     }
 
     private sealed class CategoryRepository(Category category) : ICategoryRepository
     {
-        public Task AddAsync(Category value, CancellationToken ct) => Task.CompletedTask;
+        public void Remove(Category value) { }
 
-        public Task<Category?> GetByIdAsync(Guid id, CancellationToken ct) =>
+        public Task AddAsync(Category value, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<Category?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
             Task.FromResult(id == category.Id ? category : null);
 
-        public Task<IReadOnlyList<Category>> ListAsync(CancellationToken ct) =>
+        public Task<IReadOnlyList<Category>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<Category>>([category]);
 
-        public Task<bool> NameExistsAsync(string name, Guid? excludingId, CancellationToken ct) =>
-            Task.FromResult(false);
-
-        public Task SaveAsync(CancellationToken ct) => Task.CompletedTask;
+        public Task<bool> NameExistsAsync(
+            string name,
+            Guid? excludingId,
+            CancellationToken cancellationToken
+        ) => Task.FromResult(false);
     }
 }

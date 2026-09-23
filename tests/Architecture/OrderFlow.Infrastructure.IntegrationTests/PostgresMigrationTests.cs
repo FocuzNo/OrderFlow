@@ -1,165 +1,203 @@
 using Microsoft.EntityFrameworkCore;
-using OrderFlow.Inventory.Domain.Stock;
-using OrderFlow.Inventory.Domain.Warehouses;
 using Testcontainers.PostgreSql;
-using CatalogContext = OrderFlow.Catalog.Infrastructure.Persistence.CatalogDbContext;
-using InventoryContext = OrderFlow.Inventory.Infrastructure.Persistence.InventoryDbContext;
-using NotificationsContext = OrderFlow.Notifications.Infrastructure.Persistence.NotificationsDbContext;
-using OrderingAddress = OrderFlow.Ordering.Domain.Orders.ShippingAddress;
-using OrderingAggregate = OrderFlow.Ordering.Domain.Orders.Order;
-using OrderingContext = OrderFlow.Ordering.Infrastructure.Persistence.OrderingDbContext;
-using PaymentsContext = OrderFlow.Payments.Infrastructure.Persistence.PaymentsDbContext;
+using CatalogPersistence = OrderFlow.Catalog.Infrastructure.Persistence;
+using InventoryPersistence = OrderFlow.Inventory.Infrastructure.Persistence;
+using NotificationsPersistence = OrderFlow.Notifications.Infrastructure.Persistence;
+using OrderingPersistence = OrderFlow.Ordering.Infrastructure.Persistence;
+using PaymentsPersistence = OrderFlow.Payments.Infrastructure.Persistence;
 
 namespace OrderFlow.Infrastructure.IntegrationTests;
 
-public sealed class DockerFactAttribute : FactAttribute
-{
-    public DockerFactAttribute()
-    {
-        if (
-            !string.Equals(
-                Environment.GetEnvironmentVariable("RUN_DOCKER_TESTS"),
-                "true",
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-            Skip = "Set RUN_DOCKER_TESTS=true and start Docker to run container integration tests.";
-    }
-}
-
 public sealed class PostgresMigrationTests
 {
-    [DockerFact]
-    public async Task Every_service_migration_applies_to_a_clean_PostgreSQL_database()
-    {
-        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
-        await postgres.StartAsync();
-
-        await Apply<CatalogContext>(
-            postgres.GetConnectionString(),
-            options => new CatalogContext(options)
-        );
-        await Apply<InventoryContext>(
-            postgres.GetConnectionString(),
-            options => new InventoryContext(options)
-        );
-        await Apply<OrderingContext>(
-            postgres.GetConnectionString(),
-            options => new OrderingContext(options)
-        );
-        await Apply<PaymentsContext>(
-            postgres.GetConnectionString(),
-            options => new PaymentsContext(options)
-        );
-        await Apply<NotificationsContext>(
-            postgres.GetConnectionString(),
-            options => new NotificationsContext(options)
-        );
-    }
-
-    [DockerFact]
-    public async Task Inventory_enforces_inbox_idempotency_and_concurrent_reservations()
-    {
-        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
-        await postgres.StartAsync();
-        var options = new DbContextOptionsBuilder<InventoryContext>()
-            .UseNpgsql(postgres.GetConnectionString())
+    private static DbContextOptions<TContext> Options<TContext>(string connectionString)
+        where TContext : DbContext =>
+        new DbContextOptionsBuilder<TContext>()
+            .UseNpgsql(connectionString)
             .UseSnakeCaseNamingConvention()
             .Options;
 
-        Guid stockId;
-        await using (var setup = new InventoryContext(options))
-        {
-            await setup.Database.MigrateAsync();
-            var warehouse = Warehouse.Create("Main", "Minsk");
-            var stock = StockItem.Create(Guid.NewGuid(), warehouse.Id, "SKU-1");
-            stock.Increase(5);
-            setup.Warehouses.Add(warehouse);
-            setup.StockItems.Add(stock);
-            await setup.SaveChangesAsync();
-            stockId = stock.Id;
-        }
+    [DockerFact]
+    public async Task Catalog_ShouldPersistAndReadProduct()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync();
+        await using var context = new CatalogPersistence.CatalogDbContext(
+            Options<CatalogPersistence.CatalogDbContext>(postgres.GetConnectionString())
+        );
+        await context.Database.MigrateAsync();
+        var category = OrderFlow.Catalog.Domain.Categories.Category.Create("Office", null);
+        context.Categories.Add(category);
+        var product = OrderFlow.Catalog.Domain.Products.Product.Create(
+            "SKU",
+            "Notebook",
+            null,
+            12.5m,
+            category.Id
+        );
+        var repository = new CatalogPersistence.Repositories.ProductRepository(context);
+        await repository.AddAsync(product, default);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        Assert.Equal(12.5m, (await repository.GetByIdAsync(product.Id, default))!.Price.Amount);
+    }
 
-        await using var first = new InventoryContext(options);
-        await using var second = new InventoryContext(options);
-        var firstStock = await first
-            .StockItems.Include(x => x.Reservations)
-            .SingleAsync(x => x.Id == stockId);
-        var secondStock = await second
-            .StockItems.Include(x => x.Reservations)
-            .SingleAsync(x => x.Id == stockId);
+    [DockerFact]
+    public async Task Ordering_ShouldPersistOrderWithItems()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync();
+        await using var context = new OrderingPersistence.OrderingDbContext(
+            Options<OrderingPersistence.OrderingDbContext>(postgres.GetConnectionString())
+        );
+        await context.Database.MigrateAsync();
+        var order = OrderFlow.Ordering.Domain.Orders.Order.Create(
+            Guid.NewGuid(),
+            "buyer@example.test",
+            OrderFlow.Ordering.Domain.Orders.ShippingAddress.Create(
+                "Main",
+                "Minsk",
+                "220000",
+                "BY"
+            ),
+            [
+                OrderFlow.Ordering.Domain.Orders.OrderItem.Create(
+                    Guid.NewGuid(),
+                    "Notebook",
+                    12.5m,
+                    2
+                ),
+            ]
+        );
+        var repository = new OrderingPersistence.OrderRepository(context);
+        await repository.AddAsync(order, default);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var persisted = await repository.GetByIdAsync(order.Id, default);
+        Assert.Single(persisted!.Items);
+        Assert.Equal(25m, persisted.TotalAmount);
+    }
+
+    [DockerFact]
+    public async Task Inventory_ShouldPersistReservationAndRejectDuplicateProduct()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync();
+        var options = Options<InventoryPersistence.InventoryDbContext>(
+            postgres.GetConnectionString()
+        );
+        await using var context = new InventoryPersistence.InventoryDbContext(options);
+        await context.Database.MigrateAsync();
+        var warehouse = OrderFlow.Inventory.Domain.Warehouses.Warehouse.Create("Main", "Minsk");
+        context.Warehouses.Add(warehouse);
+        var stock = OrderFlow.Inventory.Domain.Stock.StockItem.Create(
+            Guid.NewGuid(),
+            warehouse.Id,
+            "SKU"
+        );
+        stock.UpdateQuantity(10);
+        stock.Reserve(Guid.NewGuid(), 4);
+        context.StockItems.Add(stock);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var persisted = await context.StockItems.Include(item => item.Reservations).SingleAsync();
+        Assert.Equal(6, persisted.AvailableQuantity);
+        Assert.Single(persisted.Reservations);
+        context.StockItems.Add(
+            OrderFlow.Inventory.Domain.Stock.StockItem.Create(
+                stock.ProductId,
+                warehouse.Id,
+                "OTHER"
+            )
+        );
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
+    }
+
+    [DockerFact]
+    public async Task Inventory_ShouldRejectConcurrentReservations()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync();
+        var options = Options<InventoryPersistence.InventoryDbContext>(
+            postgres.GetConnectionString()
+        );
+        await using var setup = new InventoryPersistence.InventoryDbContext(options);
+        await setup.Database.MigrateAsync();
+        var warehouse = OrderFlow.Inventory.Domain.Warehouses.Warehouse.Create("Main", "Minsk");
+        setup.Warehouses.Add(warehouse);
+        var stock = OrderFlow.Inventory.Domain.Stock.StockItem.Create(
+            Guid.NewGuid(),
+            warehouse.Id,
+            "SKU"
+        );
+        stock.UpdateQuantity(5);
+        setup.StockItems.Add(stock);
+        await setup.SaveChangesAsync();
+        await using var first = new InventoryPersistence.InventoryDbContext(options);
+        await using var second = new InventoryPersistence.InventoryDbContext(options);
+        var firstStock = await first.StockItems.Include(item => item.Reservations).SingleAsync();
+        var secondStock = await second.StockItems.Include(item => item.Reservations).SingleAsync();
         firstStock.Reserve(Guid.NewGuid(), 4);
         secondStock.Reserve(Guid.NewGuid(), 4);
         await first.SaveChangesAsync();
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => second.SaveChangesAsync());
-
-        var eventId = Guid.NewGuid();
-        await using (var inbox = new InventoryContext(options))
-        {
-            inbox.InboxMessages.Add(
-                new()
-                {
-                    Id = eventId,
-                    Consumer = "test",
-                    ProcessedOnUtc = DateTimeOffset.UtcNow,
-                }
-            );
-            await inbox.SaveChangesAsync();
-        }
-        await using (var duplicate = new InventoryContext(options))
-        {
-            duplicate.InboxMessages.Add(
-                new()
-                {
-                    Id = eventId,
-                    Consumer = "test",
-                    ProcessedOnUtc = DateTimeOffset.UtcNow,
-                }
-            );
-            await Assert.ThrowsAsync<DbUpdateException>(() => duplicate.SaveChangesAsync());
-        }
     }
 
     [DockerFact]
-    public async Task Ordering_commits_aggregate_and_outbox_atomically()
+    public async Task Payments_ShouldEnforceOnePaymentPerOrder()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
         await postgres.StartAsync();
-        var options = new DbContextOptionsBuilder<OrderingContext>()
-            .UseNpgsql(postgres.GetConnectionString())
-            .UseSnakeCaseNamingConvention()
-            .Options;
-        await using var db = new OrderingContext(options);
-        await db.Database.MigrateAsync();
-        var order = OrderingAggregate.Create(
-            Guid.NewGuid(),
-            "buyer@example.test",
-            OrderingAddress.Create("1 Main St", "Minsk", "220000", "BY")
+        await using var context = new PaymentsPersistence.PaymentsDbContext(
+            Options<PaymentsPersistence.PaymentsDbContext>(postgres.GetConnectionString())
         );
-        order.AddItem(Guid.NewGuid(), "Notebook", 12.50m, 2);
-        order.Submit();
-        db.Orders.Add(order);
-
-        await db.SaveChangesAsync();
-
-        Assert.Equal(1, await db.Orders.CountAsync());
-        Assert.Equal(1, await db.OutboxMessages.CountAsync());
+        await context.Database.MigrateAsync();
+        var orderId = Guid.NewGuid();
+        context.Payments.Add(
+            OrderFlow.Payments.Domain.Payments.Payment.Create(
+                orderId,
+                10,
+                OrderFlow.Payments.Domain.Payments.PaymentMethod.Card
+            )
+        );
+        await context.SaveChangesAsync();
+        context.Payments.Add(
+            OrderFlow.Payments.Domain.Payments.Payment.Create(
+                orderId,
+                20,
+                OrderFlow.Payments.Domain.Payments.PaymentMethod.Card
+            )
+        );
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());
     }
 
-    private static async Task Apply<TContext>(
-        string connectionString,
-        Func<DbContextOptions<TContext>, TContext> factory
-    )
-        where TContext : DbContext
+    [DockerFact]
+    public async Task Notifications_ShouldQueryHistoryByOrder()
     {
-        var options = new DbContextOptionsBuilder<TContext>()
-            .UseNpgsql(connectionString)
-            .UseSnakeCaseNamingConvention()
-            .Options;
-        await using var context = factory(options);
-        await context.Database.EnsureDeletedAsync();
+        await using var postgres = new PostgreSqlBuilder("postgres:18-alpine").Build();
+        await postgres.StartAsync();
+        await using var context = new NotificationsPersistence.NotificationsDbContext(
+            Options<NotificationsPersistence.NotificationsDbContext>(postgres.GetConnectionString())
+        );
         await context.Database.MigrateAsync();
-        Assert.True(await context.Database.CanConnectAsync());
-        Assert.NotEmpty(await context.Database.GetAppliedMigrationsAsync());
+        var orderId = Guid.NewGuid();
+        context.Notifications.Add(
+            OrderFlow.Notifications.Domain.Notifications.Notification.Create(
+                orderId,
+                Guid.NewGuid(),
+                "OrderRecorded",
+                "user@example.test",
+                "Subject",
+                "Message",
+                OrderFlow.Notifications.Domain.Notifications.NotificationChannel.Email
+            )
+        );
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var records = await new NotificationsPersistence.NotificationRepository(
+            context
+        ).GetByOrderAsync(orderId, default);
+        Assert.Single(records);
+        Assert.Equal(orderId, records[0].OrderId);
     }
 }

@@ -5,9 +5,14 @@ namespace OrderFlow.Notifications.Infrastructure.Delivery;
 
 public sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : IEmailSender
 {
-    public Task SendAsync(string recipient, string subject, string body, CancellationToken ct)
+    public Task SendAsync(
+        string recipient,
+        string subject,
+        string body,
+        CancellationToken cancellationToken
+    )
     {
-        ct.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
         logger.LogInformation(
             "Development email accepted for recipient hash {RecipientHash} subject length {SubjectLength} body length {BodyLength}",
             recipient.GetHashCode(StringComparison.Ordinal),

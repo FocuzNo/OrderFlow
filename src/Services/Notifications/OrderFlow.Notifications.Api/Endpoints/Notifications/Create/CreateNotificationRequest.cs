@@ -1,19 +1,23 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Notifications.Application.Notifications.NotificationFeatures;
 
 namespace OrderFlow.Notifications.Api.Endpoints;
 
 public static partial class NotificationEndpoints
 {
-    public sealed class CreateNotificationRequest
+    public sealed record CreateNotificationRequest
     {
-        public string Recipient { get; set; } = string.Empty;
+        public Guid OrderId { get; init; }
 
-        public string Subject { get; set; } = string.Empty;
+        public Guid CustomerId { get; init; }
 
-        public string Body { get; set; } = string.Empty;
+        public string NotificationType { get; init; } = string.Empty;
 
-        public string Channel { get; set; } = "Email";
+        public string Recipient { get; init; } = string.Empty;
+
+        public string Subject { get; init; } = string.Empty;
+
+        public string Body { get; init; } = string.Empty;
+
+        public string Channel { get; init; } = "Email";
     }
 }

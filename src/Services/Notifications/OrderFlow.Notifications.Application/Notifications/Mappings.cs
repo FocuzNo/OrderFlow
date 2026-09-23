@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Notifications.Application.Abstractions.Delivery;
 using OrderFlow.Notifications.Application.Abstractions.Errors;
 using OrderFlow.Notifications.Application.Abstractions.Messaging;
@@ -10,27 +9,33 @@ namespace OrderFlow.Notifications.Application.Notifications;
 public static partial class NotificationFeatures
 {
     private static async Task<Notification> Find(
-        INotificationRepository r,
+        INotificationRepository repository,
         Guid id,
-        CancellationToken ct
-    ) => await r.GetAsync(id, ct) ?? throw new NotFoundException("Notification was not found.");
+        CancellationToken cancellationToken
+    ) =>
+        await repository.GetByIdAsync(id, cancellationToken)
+        ?? throw new NotFoundException("Notification was not found.");
 
-    private static NotificationResponse Map(Notification x) =>
+    private static NotificationResponse Map(Notification entity) =>
         new(
-            x.Id,
-            x.Recipient,
-            x.Subject,
-            x.Body,
-            x.Channel.Name,
-            x.Status.Name,
-            x.Attempts.Select(a => new NotificationAttemptResponse(
-                    a.Id,
-                    a.Succeeded,
-                    a.Error,
-                    a.AttemptedAt
+            entity.Id,
+            entity.OrderId,
+            entity.CustomerId,
+            entity.NotificationType,
+            entity.Recipient,
+            entity.Subject,
+            entity.Body,
+            entity.Channel.Name,
+            entity.Status.Name,
+            entity
+                .Attempts.Select(attempt => new NotificationAttemptResponse(
+                    attempt.Id,
+                    attempt.Succeeded,
+                    attempt.Error,
+                    attempt.AttemptedAt
                 ))
                 .ToArray(),
-            x.CreatedAt,
-            x.SentAt
+            entity.CreatedAt,
+            entity.SentAt
         );
 }

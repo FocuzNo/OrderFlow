@@ -1,3 +1,3 @@
-# System context
+# system context
 
-OrderFlow accepts commerce commands through five independent HTTP APIs. PostgreSQL is the system of record inside each bounded context. Kafka carries versioned integration events between services; no service reads another service's database. External payment and email systems are represented by configurable development adapters.
+The current implementation is the pre-Kafka baseline. See [README](../../README.md) for the supported local and Docker workflows, database ownership, endpoints and test commands. Each service commits its own local state through its own DbContext/IUnitOfWork. There is no distributed order workflow.

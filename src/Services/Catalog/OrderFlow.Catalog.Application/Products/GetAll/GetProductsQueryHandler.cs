@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -14,9 +12,9 @@ public static partial class ProductFeatures
     {
         public async Task<IReadOnlyList<ProductResponse>> Handle(
             GetProductsQuery q,
-            CancellationToken ct
+            CancellationToken cancellationToken
         ) =>
-            (await repository.ListAsync(q.Page, q.PageSize, q.Search, q.Sort, ct))
+            (await repository.ListAsync(q.Page, q.PageSize, q.Search, q.Sort, cancellationToken))
                 .Select(ProductResponse.From)
                 .ToArray();
     }

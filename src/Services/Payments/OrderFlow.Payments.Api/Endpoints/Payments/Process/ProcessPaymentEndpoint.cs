@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Payments.Application.Payments.PaymentFeatures;
 
 namespace OrderFlow.Payments.Api.Endpoints;
 
 public static partial class PaymentEndpoints
 {
-    public sealed class ProcessPaymentEndpoint(ISender s)
+    public sealed class ProcessPaymentEndpoint(ISender sender)
         : Endpoint<PaymentIdRequest, F.PaymentResponse>
     {
         public override void Configure()
@@ -15,7 +13,13 @@ public static partial class PaymentEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(PaymentIdRequest r, CancellationToken ct) =>
-            await Send.OkAsync(await s.Send(new F.ProcessPaymentCommand(r.Id), ct), ct);
+        public override async Task HandleAsync(
+            PaymentIdRequest request,
+            CancellationToken cancellationToken
+        ) =>
+            await Send.OkAsync(
+                await sender.Send(new F.ProcessPaymentCommand(request.Id), cancellationToken),
+                cancellationToken
+            );
     }
 }

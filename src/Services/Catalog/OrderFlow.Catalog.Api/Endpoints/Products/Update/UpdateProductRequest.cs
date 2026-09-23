@@ -1,5 +1,3 @@
-using FastEndpoints;
-using MediatR;
 using C = OrderFlow.Catalog.Application.Categories.CategoryFeatures;
 using P = OrderFlow.Catalog.Application.Products.ProductFeatures;
 
@@ -7,14 +5,16 @@ namespace OrderFlow.Catalog.Api.Endpoints;
 
 public static partial class CatalogEndpoints
 {
-    public sealed class UpdateProductRequest
+    public sealed record UpdateProductRequest
     {
-        public Guid Id { get; set; }
+        public decimal Price { get; init; }
 
-        public string Name { get; set; } = string.Empty;
+        public Guid Id { get; init; }
 
-        public string? Description { get; set; }
+        public string Name { get; init; } = string.Empty;
 
-        public Guid CategoryId { get; set; }
+        public string? Description { get; init; }
+
+        public Guid CategoryId { get; init; }
     }
 }

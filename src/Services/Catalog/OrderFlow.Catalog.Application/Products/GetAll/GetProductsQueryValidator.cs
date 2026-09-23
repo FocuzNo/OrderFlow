@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -13,8 +11,8 @@ public static partial class ProductFeatures
     {
         public GetProductsQueryValidator()
         {
-            RuleFor(x => x.Page).GreaterThan(0);
-            RuleFor(x => x.PageSize).InclusiveBetween(1, 100);
+            RuleFor(candidate => candidate.Page).GreaterThan(0);
+            RuleFor(candidate => candidate.PageSize).InclusiveBetween(1, 100);
         }
     }
 }

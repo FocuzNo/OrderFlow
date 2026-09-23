@@ -6,8 +6,8 @@ public static partial class OrderFeatures
     {
         public RemoveOrderItemCommandValidator()
         {
-            RuleFor(x => x.OrderId).NotEmpty();
-            RuleFor(x => x.ItemId).NotEmpty();
+            RuleFor(candidate => candidate.OrderId).NotEmpty();
+            RuleFor(candidate => candidate.ItemId).NotEmpty();
         }
     }
 }

@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -9,16 +8,29 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class CreateStockItemCommandHandler(IInventoryRepository r)
-        : IRequestHandler<CreateStockItemCommand, StockResponse>
+    public sealed class CreateStockItemCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<CreateStockItemCommand, StockResponse>
     {
-        public async Task<StockResponse> Handle(CreateStockItemCommand c, CancellationToken ct)
+        public async Task<StockResponse> Handle(
+            CreateStockItemCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            if (await r.GetStockAsync(c.ProductId, c.WarehouseId, ct) is not null)
+            if (
+                await repository.GetStockAsync(
+                    command.ProductId,
+                    command.WarehouseId,
+                    cancellationToken
+                )
+                is not null
+            )
                 throw new ConflictException("Stock item already exists.");
-            var x = StockItem.Create(c.ProductId, c.WarehouseId, c.Sku);
-            await r.AddStockItemAsync(x, ct);
-            return Map(x);
+            var entity = StockItem.Create(command.ProductId, command.WarehouseId, command.Sku);
+            await repository.AddAsync(entity, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

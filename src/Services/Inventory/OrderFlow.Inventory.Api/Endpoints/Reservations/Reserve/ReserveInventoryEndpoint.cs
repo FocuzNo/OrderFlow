@@ -1,12 +1,10 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Inventory.Application.Inventory.InventoryFeatures;
 
 namespace OrderFlow.Inventory.Api.Endpoints;
 
 public static partial class InventoryEndpoints
 {
-    public sealed class ReserveInventoryEndpoint(ISender s)
+    public sealed class ReserveInventoryEndpoint(ISender sender)
         : Endpoint<ReserveInventoryRequest, F.ReservationResponse>
     {
         public override void Configure()
@@ -15,19 +13,22 @@ public static partial class InventoryEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(ReserveInventoryRequest r, CancellationToken ct) =>
+        public override async Task HandleAsync(
+            ReserveInventoryRequest request,
+            CancellationToken cancellationToken
+        ) =>
             await Send.ResponseAsync(
-                await s.Send(
+                await sender.Send(
                     new F.ReserveInventoryCommand(
-                        r.ProductId,
-                        r.WarehouseId,
-                        r.OrderId,
-                        r.Quantity
+                        request.ProductId,
+                        request.WarehouseId,
+                        request.OrderId,
+                        request.Quantity
                     ),
-                    ct
+                    cancellationToken
                 ),
                 201,
-                ct
+                cancellationToken
             );
     }
 }

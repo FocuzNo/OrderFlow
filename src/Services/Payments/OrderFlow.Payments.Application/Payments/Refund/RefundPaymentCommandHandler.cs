@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,15 +8,20 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed class RefundPaymentCommandHandler(IPaymentRepository r)
-        : IRequestHandler<RefundPaymentCommand, PaymentResponse>
+    public sealed class RefundPaymentCommandHandler(
+        IPaymentRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<RefundPaymentCommand, PaymentResponse>
     {
-        public async Task<PaymentResponse> Handle(RefundPaymentCommand c, CancellationToken ct)
+        public async Task<PaymentResponse> Handle(
+            RefundPaymentCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.PaymentId, ct);
-            x.Refund(c.Amount, c.Reason);
-            await r.SaveAsync(ct);
-            return Map(x);
+            var entity = await Find(repository, command.PaymentId, cancellationToken);
+            entity.Refund(command.Amount, command.Reason);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

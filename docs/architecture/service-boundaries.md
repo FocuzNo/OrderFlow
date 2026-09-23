@@ -1,9 +1,3 @@
-# Service boundaries
+# service boundaries
 
-- Catalog: product and category lifecycle.
-- Inventory: warehouses, stock quantities, and reservations. Product ids are external identifiers.
-- Ordering: customer order aggregate and workflow state authority. Product data on items is a snapshot.
-- Payments: payment attempts, provider outcome, and refunds. Order ids are external identifiers.
-- Notifications: notification lifecycle and delivery attempts.
-
-Only immutable types in `OrderFlow.IntegrationContracts` cross boundaries. Domain and persistence projects are never referenced across services.
+The current implementation is the pre-Kafka baseline. See [README](../../README.md) for the supported local and Docker workflows, database ownership, endpoints and test commands. Each service commits its own local state through its own DbContext/IUnitOfWork. There is no distributed order workflow.

@@ -1,5 +1,3 @@
-using FluentValidation;
-using MediatR;
 using OrderFlow.Catalog.Application.Abstractions.Errors;
 using OrderFlow.Catalog.Application.Abstractions.Messaging;
 using OrderFlow.Catalog.Application.Abstractions.Persistence;
@@ -11,17 +9,28 @@ public static partial class ProductFeatures
 {
     public sealed class CreateProductCommandHandler(
         IProductRepository products,
-        ICategoryRepository categories
+        ICategoryRepository categories,
+        IUnitOfWork unitOfWork
     ) : IRequestHandler<CreateProductCommand, ProductResponse>
     {
-        public async Task<ProductResponse> Handle(CreateProductCommand c, CancellationToken ct)
+        public async Task<ProductResponse> Handle(
+            CreateProductCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            if (await products.SkuExistsAsync(c.Sku, null, ct))
+            if (await products.SkuExistsAsync(command.Sku, null, cancellationToken))
                 throw new ConflictException("SKU already exists.");
-            if (await categories.GetByIdAsync(c.CategoryId, ct) is null)
+            if (await categories.GetByIdAsync(command.CategoryId, cancellationToken) is null)
                 throw new NotFoundException("Category was not found.");
-            var product = Product.Create(c.Sku, c.Name, c.Description, c.Price, c.CategoryId);
-            await products.AddAsync(product, ct);
+            var product = Product.Create(
+                command.Sku,
+                command.Name,
+                command.Description,
+                command.Price,
+                command.CategoryId
+            );
+            await products.AddAsync(product, cancellationToken);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
             return ProductResponse.From(product);
         }
     }

@@ -1,4 +1,3 @@
-using FastEndpoints;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -11,11 +10,12 @@ using OrderFlow.Inventory.Application;
 using OrderFlow.Inventory.Infrastructure;
 using OrderFlow.Inventory.Infrastructure.Persistence;
 using Serilog;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddSerilog(
-    (services, c) =>
-        c
+    (services, configuration) =>
+        configuration
             .ReadFrom.Configuration(builder.Configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Service", "OrderFlow.Inventory")
@@ -33,15 +33,19 @@ builder
     .AddDbContextCheck<InventoryDbContext>("postgres", tags: ["ready"]);
 builder
     .Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService("OrderFlow.Inventory"))
-    .WithTracing(t =>
-        t.AddAspNetCoreInstrumentation()
+    .ConfigureResource(resourceBuilder => resourceBuilder.AddService("OrderFlow.Inventory"))
+    .WithTracing(tracingBuilder =>
+        tracingBuilder
+            .AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
-            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql", "OrderFlow.Inventory.Kafka")
+            .AddSource("Microsoft.EntityFrameworkCore", "Npgsql")
             .AddOtlpExporter()
     )
-    .WithMetrics(m =>
-        m.AddAspNetCoreInstrumentation().AddHttpClientInstrumentation().AddOtlpExporter()
+    .WithMetrics(metricsBuilder =>
+        metricsBuilder
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter()
     );
 var app = builder.Build();
 if (args.Contains("--migrate", StringComparer.OrdinalIgnoreCase))
@@ -55,13 +59,14 @@ app.UseSerilogRequestLogging();
 app.UseExceptionHandler();
 app.UseFastEndpoints();
 app.MapOpenApi();
+app.MapScalarApiReference("/scalar");
 app.MapHealthChecks(
     "/health/live",
-    new HealthCheckOptions { Predicate = x => x.Tags.Contains("live") }
+    new HealthCheckOptions { Predicate = candidate => candidate.Tags.Contains("live") }
 );
 app.MapHealthChecks(
     "/health/ready",
-    new HealthCheckOptions { Predicate = x => x.Tags.Contains("ready") }
+    new HealthCheckOptions { Predicate = candidate => candidate.Tags.Contains("ready") }
 );
 app.Run();
 

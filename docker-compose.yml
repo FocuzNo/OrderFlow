@@ -1,6 +1,7 @@
 name: orderflow
 
-x-postgres: &postgres
+services:
+  catalog-postgres:
     image: postgres:18-alpine
     restart: unless-stopped
 
@@ -361,8 +362,32 @@ services:
 # NETWORK
 # ============================================================
 
-networks:
-    orderflow:
+  notifications-postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-orderflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderflow_dev_only}
+      POSTGRES_DB: notifications
+    ports: ["5437:5432"]
+    volumes: [notifications-postgres-data:/var/lib/postgresql]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-orderflow} -d notifications"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  notifications-api:
+    build:
+      context: .
+      dockerfile: src/Services/Notifications/OrderFlow.Notifications.Api/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__NotificationsDatabase: Host=notifications-postgres;Database=notifications;Username=${POSTGRES_USER:-orderflow};Password=${POSTGRES_PASSWORD:-orderflow_dev_only}
+    ports: ["5005:8080"]
+    depends_on:
+      notifications-postgres:
+        condition: service_healthy
 
 
 # ============================================================

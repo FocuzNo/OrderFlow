@@ -8,8 +8,9 @@ public static partial class CategoryFeatures
     {
         public CreateCategoryCommandValidator()
         {
-            RuleFor(x => x.Name).NotEmpty().MaximumLength(Category.MaxNameLength);
-            RuleFor(x => x.Description).MaximumLength(Category.MaxDescriptionLength);
+            RuleFor(candidate => candidate.Name).NotEmpty().MaximumLength(Category.MaxNameLength);
+            RuleFor(candidate => candidate.Description)
+                .MaximumLength(Category.MaxDescriptionLength);
         }
     }
 }

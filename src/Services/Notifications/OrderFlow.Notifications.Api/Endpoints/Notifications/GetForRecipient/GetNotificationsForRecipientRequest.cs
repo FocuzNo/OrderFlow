@@ -1,13 +1,11 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Notifications.Application.Notifications.NotificationFeatures;
 
 namespace OrderFlow.Notifications.Api.Endpoints;
 
 public static partial class NotificationEndpoints
 {
-    public sealed class GetNotificationsForRecipientRequest
+    public sealed record GetNotificationsForRecipientRequest
     {
-        public string Recipient { get; set; } = string.Empty;
+        public string Recipient { get; init; } = string.Empty;
     }
 }

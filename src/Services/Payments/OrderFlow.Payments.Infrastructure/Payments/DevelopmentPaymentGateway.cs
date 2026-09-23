@@ -6,9 +6,13 @@ namespace OrderFlow.Payments.Infrastructure.Payments;
 public sealed class DevelopmentPaymentGateway(IOptions<DevelopmentPaymentGatewayOptions> options)
     : IPaymentGateway
 {
-    public Task<PaymentGatewayResult> ChargeAsync(Guid id, decimal amount, CancellationToken ct)
+    public Task<PaymentGatewayResult> ChargeAsync(
+        Guid id,
+        decimal amount,
+        CancellationToken cancellationToken
+    )
     {
-        ct.ThrowIfCancellationRequested();
+        cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(
             options.Value.Succeed
                 ? new PaymentGatewayResult(true, $"DEV-{id:N}", null)

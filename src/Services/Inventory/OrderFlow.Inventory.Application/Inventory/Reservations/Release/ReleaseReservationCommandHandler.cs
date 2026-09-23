@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -9,14 +8,24 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class ReleaseReservationCommandHandler(IInventoryRepository r)
-        : IRequestHandler<ReleaseReservationCommand>
+    public sealed class ReleaseReservationCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<ReleaseReservationCommand>
     {
-        public async Task Handle(ReleaseReservationCommand c, CancellationToken ct)
+        public async Task Handle(
+            ReleaseReservationCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.ProductId, c.WarehouseId, ct);
-            x.Release(c.ReservationId);
-            await r.SaveAsync(ct);
+            var entity = await Find(
+                repository,
+                command.ProductId,
+                command.WarehouseId,
+                cancellationToken
+            );
+            entity.Release(command.ReservationId);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
         }
     }
 }

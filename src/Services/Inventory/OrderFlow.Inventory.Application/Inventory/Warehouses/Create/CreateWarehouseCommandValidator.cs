@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Inventory.Application.Inventory;
 
 public sealed class CreateWarehouseCommandValidator
@@ -7,7 +5,7 @@ public sealed class CreateWarehouseCommandValidator
 {
     public CreateWarehouseCommandValidator()
     {
-        RuleFor(x => x.Name).NotEmpty().MaximumLength(120);
-        RuleFor(x => x.Location).NotEmpty().MaximumLength(500);
+        RuleFor(candidate => candidate.Name).NotEmpty().MaximumLength(120);
+        RuleFor(candidate => candidate.Location).NotEmpty().MaximumLength(500);
     }
 }

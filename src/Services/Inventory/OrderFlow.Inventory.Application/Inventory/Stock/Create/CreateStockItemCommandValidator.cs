@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Inventory.Application.Inventory;
 
 public sealed class CreateStockItemCommandValidator
@@ -7,8 +5,8 @@ public sealed class CreateStockItemCommandValidator
 {
     public CreateStockItemCommandValidator()
     {
-        RuleFor(x => x.ProductId).NotEmpty();
-        RuleFor(x => x.WarehouseId).NotEmpty();
-        RuleFor(x => x.Sku).NotEmpty().MaximumLength(64);
+        RuleFor(candidate => candidate.ProductId).NotEmpty();
+        RuleFor(candidate => candidate.WarehouseId).NotEmpty();
+        RuleFor(candidate => candidate.Sku).NotEmpty().MaximumLength(64);
     }
 }

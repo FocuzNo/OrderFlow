@@ -1,8 +1,4 @@
 <Solution>
-  <Folder Name="/BuildingBlocks/">
-    <Project Path="src/BuildingBlocks/OrderFlow.IntegrationContracts/OrderFlow.IntegrationContracts.csproj" />
-  </Folder>
-  <Folder Name="/Architecture/" />
   <Folder Name="/Architecture/Tests/">
     <Project Path="tests/Architecture/OrderFlow.Infrastructure.IntegrationTests/OrderFlow.Infrastructure.IntegrationTests.csproj" />
   </Folder>

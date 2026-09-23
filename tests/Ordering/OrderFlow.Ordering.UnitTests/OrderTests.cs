@@ -9,27 +9,49 @@ public sealed class OrderTests
         Order.Create(
             Guid.NewGuid(),
             "buyer@example.test",
-            ShippingAddress.Create("1 Main St", "Minsk", "220000", "BY")
+            ShippingAddress.Create("Main", "Minsk", "220000", "BY"),
+            [OrderItem.Create(Guid.NewGuid(), "Notebook", 12.5m, 2)]
         );
 
     [Fact]
-    public void Submit_moves_order_to_inventory_and_raises_event()
+    public void Create_ShouldCalculateTotalFromItems()
     {
         var order = CreateOrder();
-        order.AddItem(Guid.NewGuid(), "Notebook", 12.50m, 2);
-        order.Submit();
-
-        Assert.Equal(OrderStatus.PendingInventory, order.Status);
         Assert.Equal(25m, order.TotalAmount);
-        Assert.Contains(order.DomainEvents, x => x is OrderSubmittedDomainEvent);
+        Assert.Equal(OrderStatus.PendingInventory, order.Status);
     }
 
     [Fact]
-    public void Submitted_order_cannot_be_edited()
+    public void Confirm_ShouldRequireInventoryAndPaymentProcessing()
     {
         var order = CreateOrder();
-        order.AddItem(Guid.NewGuid(), "Notebook", 10m, 1);
-        order.Submit();
-        Assert.Throws<DomainException>(() => order.AddItem(Guid.NewGuid(), "Pen", 2m, 1));
+        Assert.Throws<DomainException>(() => order.Confirm());
+        Assert.Throws<DomainException>(() => order.MarkPaymentProcessing());
+        order.MarkInventoryReserved();
+        Assert.Throws<DomainException>(() => order.Confirm());
+        order.MarkPaymentProcessing();
+        order.Confirm();
+        Assert.Equal(OrderStatus.Confirmed, order.Status);
+    }
+
+    [Fact]
+    public void Create_ShouldRejectEmptyOrder() =>
+        Assert.Throws<DomainException>(() =>
+            Order.Create(
+                Guid.NewGuid(),
+                "buyer@example.test",
+                ShippingAddress.Create("Main", "Minsk", "220000", "BY"),
+                []
+            )
+        );
+
+    [Fact]
+    public void Cancel_ShouldRejectConfirmedOrder()
+    {
+        var order = CreateOrder();
+        order.MarkInventoryReserved();
+        order.MarkPaymentProcessing();
+        order.Confirm();
+        Assert.Throws<DomainException>(() => order.Cancel("Cancelled"));
     }
 }

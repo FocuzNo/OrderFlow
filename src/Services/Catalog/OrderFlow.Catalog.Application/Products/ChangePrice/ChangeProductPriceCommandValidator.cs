@@ -7,8 +7,8 @@ public static partial class ProductFeatures
     {
         public ChangeProductPriceCommandValidator()
         {
-            RuleFor(x => x.Id).NotEmpty();
-            RuleFor(x => x.Price).GreaterThanOrEqualTo(0);
+            RuleFor(candidate => candidate.Id).NotEmpty();
+            RuleFor(candidate => candidate.Price).GreaterThanOrEqualTo(0);
         }
     }
 }

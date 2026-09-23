@@ -1,12 +1,11 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Ordering.Application.Orders.OrderFeatures;
 
 namespace OrderFlow.Ordering.Api.Endpoints;
 
 public static partial class OrderEndpoints
 {
-    public sealed class SubmitOrderEndpoint(ISender s) : Endpoint<OrderIdRequest, F.OrderResponse>
+    public sealed class SubmitOrderEndpoint(ISender sender)
+        : Endpoint<OrderIdRequest, F.OrderResponse>
     {
         public override void Configure()
         {
@@ -14,7 +13,13 @@ public static partial class OrderEndpoints
             AllowAnonymous();
         }
 
-        public override async Task HandleAsync(OrderIdRequest r, CancellationToken ct) =>
-            await Send.OkAsync(await s.Send(new F.SubmitOrderCommand(r.Id), ct), ct);
+        public override async Task HandleAsync(
+            OrderIdRequest request,
+            CancellationToken cancellationToken
+        ) =>
+            await Send.OkAsync(
+                await sender.Send(new F.SubmitOrderCommand(request.Id), cancellationToken),
+                cancellationToken
+            );
     }
 }

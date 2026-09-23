@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Inventory.Application.Abstractions.Errors;
 using OrderFlow.Inventory.Application.Abstractions.Messaging;
 using OrderFlow.Inventory.Application.Abstractions.Persistence;
@@ -9,15 +8,25 @@ namespace OrderFlow.Inventory.Application.Inventory;
 
 public static partial class InventoryFeatures
 {
-    public sealed class IncreaseStockCommandHandler(IInventoryRepository r)
-        : IRequestHandler<IncreaseStockCommand, StockResponse>
+    public sealed class IncreaseStockCommandHandler(
+        IInventoryRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<IncreaseStockCommand, StockResponse>
     {
-        public async Task<StockResponse> Handle(IncreaseStockCommand c, CancellationToken ct)
+        public async Task<StockResponse> Handle(
+            IncreaseStockCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.ProductId, c.WarehouseId, ct);
-            x.Increase(c.Quantity);
-            await r.SaveAsync(ct);
-            return Map(x);
+            var entity = await Find(
+                repository,
+                command.ProductId,
+                command.WarehouseId,
+                cancellationToken
+            );
+            entity.Increase(command.Quantity);
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

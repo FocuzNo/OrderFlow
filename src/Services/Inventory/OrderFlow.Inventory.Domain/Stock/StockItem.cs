@@ -42,6 +42,19 @@ public sealed class StockItem : AggregateRoot
         return new StockItem(Guid.NewGuid(), productId, warehouseId, sku.Trim().ToUpperInvariant());
     }
 
+    public void UpdateQuantity(int quantity)
+    {
+        if (quantity < ReservedQuantity)
+            throw new DomainException("Quantity cannot be below reserved quantity.");
+        QuantityOnHand = quantity;
+    }
+
+    public void EnsureCanDelete()
+    {
+        if (ReservedQuantity != 0)
+            throw new DomainException("Reserved inventory cannot be deleted.");
+    }
+
     public void Increase(int quantity)
     {
         EnsurePositive(quantity);
@@ -64,7 +77,11 @@ public sealed class StockItem : AggregateRoot
         EnsurePositive(quantity);
         if (orderId == Guid.Empty)
             throw new DomainException("Order is required.");
-        if (_reservations.Any(x => x.OrderId == orderId && x.Status == ReservationStatus.Pending))
+        if (
+            _reservations.Any(candidate =>
+                candidate.OrderId == orderId && candidate.Status == ReservationStatus.Pending
+            )
+        )
             throw new DomainException(
                 "Order already has an active reservation for this stock item."
             );
@@ -73,16 +90,7 @@ public sealed class StockItem : AggregateRoot
         var reservation = StockReservation.Create(Id, orderId, quantity);
         _reservations.Add(reservation);
         ReservedQuantity += quantity;
-        Raise(
-            new StockReservedDomainEvent(
-                Guid.NewGuid(),
-                DateTimeOffset.UtcNow,
-                reservation.Id,
-                orderId,
-                ProductId,
-                quantity
-            )
-        );
+
         return reservation;
     }
 
@@ -99,20 +107,10 @@ public sealed class StockItem : AggregateRoot
         var reservation = Find(reservationId);
         reservation.Release();
         ReservedQuantity -= reservation.Quantity;
-        Raise(
-            new StockReleasedDomainEvent(
-                Guid.NewGuid(),
-                DateTimeOffset.UtcNow,
-                reservation.Id,
-                reservation.OrderId,
-                ProductId,
-                reservation.Quantity
-            )
-        );
     }
 
     private StockReservation Find(Guid id) =>
-        _reservations.SingleOrDefault(x => x.Id == id)
+        _reservations.SingleOrDefault(candidate => candidate.Id == id)
         ?? throw new DomainException("Reservation was not found on this stock item.");
 
     private static void EnsurePositive(int quantity)

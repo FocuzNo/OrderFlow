@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,19 +8,25 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    private static async Task<Payment> Find(IPaymentRepository r, Guid id, CancellationToken ct) =>
-        await r.GetAsync(id, ct) ?? throw new NotFoundException("Payment was not found.");
+    private static async Task<Payment> Find(
+        IPaymentRepository repository,
+        Guid id,
+        CancellationToken cancellationToken
+    ) =>
+        await repository.GetByIdAsync(id, cancellationToken)
+        ?? throw new NotFoundException("Payment was not found.");
 
-    private static PaymentResponse Map(Payment x) =>
+    private static PaymentResponse Map(Payment entity) =>
         new(
-            x.Id,
-            x.OrderId,
-            x.Amount,
-            x.Method.Name,
-            x.Status.Name,
-            x.ProviderReference,
-            x.FailureReason,
-            x.Refunds.Select(y => new RefundResponse(y.Id, y.Amount, y.Reason, y.CreatedAt))
+            entity.Id,
+            entity.OrderId,
+            entity.Amount,
+            entity.Method.Name,
+            entity.Status.Name,
+            entity.ProviderReference,
+            entity.FailureReason,
+            entity
+                .Refunds.Select(y => new RefundResponse(y.Id, y.Amount, y.Reason, y.CreatedAt))
                 .ToArray()
         );
 }

@@ -1,17 +1,21 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace OrderFlow.Ordering.Infrastructure.Persistence;
 
 public sealed class OrderingDbContextFactory : IDesignTimeDbContextFactory<OrderingDbContext>
 {
-    public OrderingDbContext CreateDbContext(string[] a) =>
-        new(
+    public OrderingDbContext CreateDbContext(string[] args)
+    {
+        var connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__OrderingDatabase")
+            ?? throw new InvalidOperationException(
+                "Set ConnectionStrings__OrderingDatabase for EF tooling."
+            );
+        return new OrderingDbContext(
             new DbContextOptionsBuilder<OrderingDbContext>()
-                .UseNpgsql(
-                    "Host=localhost;Database=orderflow_ordering;Username=postgres;Password=postgres"
-                )
+                .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .Options
         );
+    }
 }

@@ -5,6 +5,6 @@ public static partial class ProductFeatures
     public sealed class DeactivateProductCommandValidator
         : AbstractValidator<DeactivateProductCommand>
     {
-        public DeactivateProductCommandValidator() => RuleFor(x => x.Id).NotEmpty();
+        public DeactivateProductCommandValidator() => RuleFor(candidate => candidate.Id).NotEmpty();
     }
 }

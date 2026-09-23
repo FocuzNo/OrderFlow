@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
@@ -8,15 +7,25 @@ namespace OrderFlow.Ordering.Application.Orders;
 
 public static partial class OrderFeatures
 {
-    public sealed class AddOrderItemCommandHandler(IOrderRepository r)
-        : IRequestHandler<AddOrderItemCommand, OrderResponse>
+    public sealed class AddOrderItemCommandHandler(
+        IOrderRepository repository,
+        IUnitOfWork unitOfWork
+    ) : IRequestHandler<AddOrderItemCommand, OrderResponse>
     {
-        public async Task<OrderResponse> Handle(AddOrderItemCommand c, CancellationToken ct)
+        public async Task<OrderResponse> Handle(
+            AddOrderItemCommand command,
+            CancellationToken cancellationToken
+        )
         {
-            var x = await Find(r, c.OrderId, ct);
-            x.AddItem(c.ProductId, c.ProductName, c.UnitPrice, c.Quantity);
-            await r.SaveAsync(ct);
-            return Map(x);
+            var entity = await Find(repository, command.OrderId, cancellationToken);
+            entity.AddItem(
+                command.ProductId,
+                command.ProductName,
+                command.UnitPrice,
+                command.Quantity
+            );
+            await unitOfWork.SaveChangesAsync(cancellationToken);
+            return Map(entity);
         }
     }
 }

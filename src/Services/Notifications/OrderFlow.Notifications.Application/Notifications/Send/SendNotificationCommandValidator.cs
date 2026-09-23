@@ -5,6 +5,6 @@ public static partial class NotificationFeatures
     public sealed class SendNotificationCommandValidator
         : AbstractValidator<SendNotificationCommand>
     {
-        public SendNotificationCommandValidator() => RuleFor(x => x.Id).NotEmpty();
+        public SendNotificationCommandValidator() => RuleFor(candidate => candidate.Id).NotEmpty();
     }
 }

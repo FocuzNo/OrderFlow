@@ -1,4 +1,3 @@
-using MediatR;
 using OrderFlow.Payments.Application.Abstractions.Errors;
 using OrderFlow.Payments.Application.Abstractions.Messaging;
 using OrderFlow.Payments.Application.Abstractions.Payments;
@@ -9,12 +8,15 @@ namespace OrderFlow.Payments.Application.Payments;
 
 public static partial class PaymentFeatures
 {
-    public sealed class GetPaymentByOrderQueryHandler(IPaymentRepository r)
+    public sealed class GetPaymentByOrderQueryHandler(IPaymentRepository repository)
         : IRequestHandler<GetPaymentByOrderQuery, PaymentResponse>
     {
-        public async Task<PaymentResponse> Handle(GetPaymentByOrderQuery q, CancellationToken ct) =>
+        public async Task<PaymentResponse> Handle(
+            GetPaymentByOrderQuery q,
+            CancellationToken cancellationToken
+        ) =>
             Map(
-                await r.GetByOrderAsync(q.OrderId, ct)
+                await repository.GetByOrderAsync(q.OrderId, cancellationToken)
                     ?? throw new NotFoundException("Payment was not found.")
             );
     }

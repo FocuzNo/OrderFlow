@@ -1,17 +1,21 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace OrderFlow.Inventory.Infrastructure.Persistence;
 
 public sealed class InventoryDbContextFactory : IDesignTimeDbContextFactory<InventoryDbContext>
 {
-    public InventoryDbContext CreateDbContext(string[] args) =>
-        new(
+    public InventoryDbContext CreateDbContext(string[] args)
+    {
+        var connectionString =
+            Environment.GetEnvironmentVariable("ConnectionStrings__InventoryDatabase")
+            ?? throw new InvalidOperationException(
+                "Set ConnectionStrings__InventoryDatabase for EF tooling."
+            );
+        return new InventoryDbContext(
             new DbContextOptionsBuilder<InventoryDbContext>()
-                .UseNpgsql(
-                    "Host=localhost;Database=orderflow_inventory;Username=postgres;Password=postgres"
-                )
+                .UseNpgsql(connectionString)
                 .UseSnakeCaseNamingConvention()
                 .Options
         );
+    }
 }

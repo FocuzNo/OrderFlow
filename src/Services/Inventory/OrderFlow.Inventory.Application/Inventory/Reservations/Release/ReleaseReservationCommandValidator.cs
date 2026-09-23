@@ -7,9 +7,9 @@ public static partial class InventoryFeatures
     {
         public ReleaseReservationCommandValidator()
         {
-            RuleFor(x => x.ProductId).NotEmpty();
-            RuleFor(x => x.WarehouseId).NotEmpty();
-            RuleFor(x => x.ReservationId).NotEmpty();
+            RuleFor(candidate => candidate.ProductId).NotEmpty();
+            RuleFor(candidate => candidate.WarehouseId).NotEmpty();
+            RuleFor(candidate => candidate.ReservationId).NotEmpty();
         }
     }
 }

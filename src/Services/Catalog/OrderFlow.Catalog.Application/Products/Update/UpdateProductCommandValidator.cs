@@ -8,10 +8,11 @@ public static partial class ProductFeatures
     {
         public UpdateProductCommandValidator()
         {
-            RuleFor(x => x.Id).NotEmpty();
-            RuleFor(x => x.Name).NotEmpty().MaximumLength(Product.MaxNameLength);
-            RuleFor(x => x.Description).MaximumLength(Product.MaxDescriptionLength);
-            RuleFor(x => x.CategoryId).NotEmpty();
+            RuleFor(command => command.Price).GreaterThanOrEqualTo(0);
+            RuleFor(candidate => candidate.Id).NotEmpty();
+            RuleFor(candidate => candidate.Name).NotEmpty().MaximumLength(Product.MaxNameLength);
+            RuleFor(candidate => candidate.Description).MaximumLength(Product.MaxDescriptionLength);
+            RuleFor(candidate => candidate.CategoryId).NotEmpty();
         }
     }
 }

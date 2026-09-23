@@ -1,15 +1,13 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Ordering.Application.Orders.OrderFeatures;
 
 namespace OrderFlow.Ordering.Api.Endpoints;
 
 public static partial class OrderEndpoints
 {
-    public sealed class RemoveOrderItemRequest
+    public sealed record RemoveOrderItemRequest
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; init; }
 
-        public Guid ItemId { get; set; }
+        public Guid ItemId { get; init; }
     }
 }

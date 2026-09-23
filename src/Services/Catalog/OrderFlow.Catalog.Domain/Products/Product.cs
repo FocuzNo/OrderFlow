@@ -67,16 +67,7 @@ public sealed class Product : AggregateRoot
             categoryId,
             now
         );
-        product.Raise(
-            new ProductCreatedDomainEvent(
-                Guid.NewGuid(),
-                now,
-                product.Id,
-                product.Sku.Value,
-                product.Name,
-                product.Price.Amount
-            )
-        );
+
         return product;
     }
 
@@ -93,13 +84,8 @@ public sealed class Product : AggregateRoot
     public void ChangePrice(decimal price)
     {
         EnsureNotArchived();
-        var old = Price.Amount;
         Price = Money.From(price);
         Touch();
-        if (old != Price.Amount)
-            Raise(
-                new ProductPriceChangedDomainEvent(Guid.NewGuid(), UpdatedAt, Id, old, Price.Amount)
-            );
     }
 
     public void Activate()
@@ -122,7 +108,6 @@ public sealed class Product : AggregateRoot
             return;
         Status = ProductStatus.Archived;
         Touch();
-        Raise(new ProductArchivedDomainEvent(Guid.NewGuid(), UpdatedAt, Id));
     }
 
     private void Touch() => UpdatedAt = DateTimeOffset.UtcNow;

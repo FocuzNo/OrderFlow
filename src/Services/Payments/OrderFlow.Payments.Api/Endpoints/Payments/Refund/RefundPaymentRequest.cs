@@ -1,17 +1,15 @@
-using FastEndpoints;
-using MediatR;
 using F = OrderFlow.Payments.Application.Payments.PaymentFeatures;
 
 namespace OrderFlow.Payments.Api.Endpoints;
 
 public static partial class PaymentEndpoints
 {
-    public sealed class RefundPaymentRequest
+    public sealed record RefundPaymentRequest
     {
-        public Guid Id { get; set; }
+        public Guid Id { get; init; }
 
-        public decimal Amount { get; set; }
+        public decimal Amount { get; init; }
 
-        public string Reason { get; set; } = string.Empty;
+        public string Reason { get; init; } = string.Empty;
     }
 }

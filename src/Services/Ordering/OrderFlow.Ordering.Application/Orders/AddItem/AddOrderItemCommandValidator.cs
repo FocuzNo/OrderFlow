@@ -1,5 +1,3 @@
-using FluentValidation;
-
 namespace OrderFlow.Ordering.Application.Orders;
 
 public sealed class AddOrderItemCommandValidator
@@ -7,9 +5,9 @@ public sealed class AddOrderItemCommandValidator
 {
     public AddOrderItemCommandValidator()
     {
-        RuleFor(x => x.ProductId).NotEmpty();
-        RuleFor(x => x.ProductName).NotEmpty().MaximumLength(200);
-        RuleFor(x => x.UnitPrice).GreaterThanOrEqualTo(0);
-        RuleFor(x => x.Quantity).GreaterThan(0);
+        RuleFor(candidate => candidate.ProductId).NotEmpty();
+        RuleFor(candidate => candidate.ProductName).NotEmpty().MaximumLength(200);
+        RuleFor(candidate => candidate.UnitPrice).GreaterThanOrEqualTo(0);
+        RuleFor(candidate => candidate.Quantity).GreaterThan(0);
     }
 }
