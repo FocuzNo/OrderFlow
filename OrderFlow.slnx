@@ -12,6 +12,9 @@
     <Project Path="tests/Catalog/OrderFlow.Catalog.Application.UnitTests/OrderFlow.Catalog.Application.UnitTests.csproj" />
     <Project Path="tests/Catalog/OrderFlow.Catalog.Domain.UnitTests/OrderFlow.Catalog.Domain.UnitTests.csproj" />
   </Folder>
+  <Folder Name="/Contracts/">
+    <Project Path="OrderFlow.IntegrationEvents/OrderFlow.IntegrationEvents.csproj" />
+  </Folder>
   <Folder Name="/Inventory/">
     <Project Path="src/Services/Inventory/OrderFlow.Inventory.Api/OrderFlow.Inventory.Api.csproj" />
     <Project Path="src/Services/Inventory/OrderFlow.Inventory.Application/OrderFlow.Inventory.Application.csproj" />

@@ -1,7 +1,6 @@
-using OrderFlow.Ordering.Application.Abstractions.Errors;
-using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
 using OrderFlow.Ordering.Domain.Orders;
+using OrderFlow.Ordering.Application.Abstractions.Messaging;
 
 namespace OrderFlow.Ordering.Application.Orders;
 
@@ -9,8 +8,9 @@ public static partial class OrderFeatures
 {
     public sealed class CreateOrderCommandHandler(
         IOrderRepository repository,
-        IUnitOfWork unitOfWork
-    ) : IRequestHandler<CreateOrderCommand, OrderResponse>
+        IUnitOfWork unitOfWork,
+        IOrderCreatedPublisher orderCreatedPublisher)
+        : IRequestHandler<CreateOrderCommand, OrderResponse>
     {
         public async Task<OrderResponse> Handle(
             CreateOrderCommand command,
@@ -38,8 +38,16 @@ public static partial class OrderFeatures
                     )
                     .ToArray()
             );
-            await repository.AddAsync(entity, cancellationToken);
+            await repository.AddAsync(
+                entity,
+                cancellationToken);
+
             await unitOfWork.SaveChangesAsync(cancellationToken);
+
+            await orderCreatedPublisher.PublishAsync(
+                entity,
+                cancellationToken);
+
             return Map(entity);
         }
     }

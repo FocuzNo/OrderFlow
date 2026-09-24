@@ -1,96 +1,208 @@
-# OrderFlow — pre-Kafka foundation
+# OrderFlow
 
-Educational .NET 10 / C# 14 backend with five independent Clean Architecture bounded contexts. Each service owns Domain, Application, Infrastructure, Api, a PostgreSQL database and one InitialCreate migration. No service references another service project.
+OrderFlow — микросервисная backend-платформа для управления каталогом товаров, заказами, складскими остатками, платежами и уведомлениями. Система построена на .NET 10 и PostgreSQL с разделением бизнес-областей на пять независимых сервисов.
 
-Kafka is NOT implemented yet. Transactional Outbox is NOT implemented yet. Distributed order workflow and Saga are NOT implemented yet. These will be learned manually after the local foundation, starting with a naive producer and the dual-write problem.
+Каждый микросервис владеет своей доменной моделью, API, базой данных, DbContext и миграциями. Сервисы не обращаются к чужим базам данных и не используют общий Domain или DbContext.
 
-## Architecture
+## Микросервисы
 
-FastEndpoints request records → MediatR CQRS → FluentValidation pipeline → handler → rich domain model → aggregate-specific repository → IUnitOfWork. Each DbContext implements its service's IUnitOfWork directly. Generic repositories stage changes; handlers commit. EF Core 10/Npgsql and all entity configurations stay in Infrastructure. SmartEnums describe lifecycle states.
+| Сервис | Ответственность | Основной API | Scalar |
+| --- | --- | --- | --- |
+| Catalog | Товары, категории, цены и статусы | `/api/products` | [localhost:5001/scalar](http://localhost:5001/scalar) |
+| Inventory | Склады, остатки и резервирование | `/api/inventory` | [localhost:5002/scalar](http://localhost:5002/scalar) |
+| Ordering | Создание, чтение и отмена заказов | `/api/orders` | [localhost:5003/scalar](http://localhost:5003/scalar) |
+| Payments | Обработка платежей и возвраты | `/api/payments` | [localhost:5004/scalar](http://localhost:5004/scalar) |
+| Notifications | История уведомлений и попытки доставки | `/api/notifications` | [localhost:5005/scalar](http://localhost:5005/scalar) |
 
-Services use Serilog request logging, correlation IDs, centralized ProblemDetails (400 validation, 404 missing, 409 domain/uniqueness/concurrency conflicts, 500 unexpected failure), OpenAPI and PostgreSQL health checks. No real payment provider, SMTP or SMS is contacted.
+Порты относятся к Docker Compose. Полные HTTP-контракты и доступные операции представлены в Scalar каждого сервиса.
 
-## Services, ports and APIs
+## Технологии
 
-| Service | API port | PostgreSQL host port | Main endpoints |
-|---|---:|---:|---|
-| Catalog | 5001 | 5433 | GET/POST /api/products; GET/PUT/DELETE /api/products/{id}; categories, product price/status |
-| Inventory | 5002 | 5434 | GET/POST /api/inventory; GET/PUT/DELETE /api/inventory/{productId}; warehouses and reservation operations |
-| Ordering | 5003 | 5435 | GET/POST /api/orders; GET /api/orders/{id}; cancellation |
-| Payments | 5004 | 5436 | GET/POST /api/payments; GET /api/payments/{id}; GET /api/payments/order/{id}; refunds |
-| Notifications | 5005 | 5437 | GET/POST /api/notifications; GET /api/notifications/{id}; GET /api/notifications/order/{orderId} |
+- .NET 10, C# 14, ASP.NET Core и FastEndpoints.
+- Clean Architecture, Vertical Slice, CQRS и MediatR.
+- FluentValidation и DDD: доменные инварианты, value objects и SmartEnum.
+- Entity Framework Core 10, Npgsql и PostgreSQL 18.
+- Apache Kafka и Confluent.Kafka для развиваемого событийного взаимодействия.
+- Serilog, correlation IDs, OpenTelemetry и централизованный ProblemDetails.
+- OpenAPI и Scalar.
+- Docker Compose, GitHub Actions, xUnit и Testcontainers.
 
-All services expose GET /health/live, GET /health/ready and /openapi/v1.json. Each API also includes an interactive Scalar UI at /scalar, where you can inspect the contract and execute requests against the running service. Liveness checks the process; readiness checks only the service's own PostgreSQL connection.
+## Архитектура
 
-Scalar URLs:
+Каждый сервис разделён на четыре слоя:
 
-- Catalog: http://localhost:5001/scalar
-- Inventory: http://localhost:5002/scalar
-- Ordering: http://localhost:5003/scalar
-- Payments: http://localhost:5004/scalar
-- Notifications: http://localhost:5005/scalar
+| Слой | Ответственность |
+| --- | --- |
+| Domain | Агрегаты, сущности, value objects и бизнес-правила |
+| Application | Commands, queries, handlers, validators и абстракции |
+| Infrastructure | EF Core, PostgreSQL, репозитории и внешние адаптеры |
+| Api | HTTP endpoints, контракты запросов и обработка ошибок |
 
-Lists use Page (default 1) and PageSize (default 20, maximum 100). Existing recipient/customer-specific history queries are also retained.
+Application зависит от Domain; Infrastructure реализует абстракции Application. Api связывает компоненты через dependency injection. EF Core и Kafka не проникают в бизнес-слои.
 
-## Workflow A: local .NET with PostgreSQL
+Путь запроса:
 
-Install .NET 10 SDK and PostgreSQL 18 (or start just the Compose PostgreSQL services). Create one database per service. From the repository root:
+```text
+HTTP → FastEndpoints → MediatR → ValidationBehavior
+     → Handler → Domain → Repository → UnitOfWork → PostgreSQL
+```
+
+Репозитории подготавливают изменения, а обработчики фиксируют их через `IUnitOfWork`. Роль Unit of Work выполняет DbContext соответствующего сервиса.
+
+`OrderFlow.IntegrationEvents` содержит транспортные контракты событий, а не общую бизнес-модель.
+
+### Структура репозитория
+
+```text
+src/Services/
+├── Catalog/
+├── Inventory/
+├── Ordering/
+├── Payments/
+└── Notifications/
+    ├── OrderFlow.Notifications.Api/
+    ├── OrderFlow.Notifications.Application/
+    ├── OrderFlow.Notifications.Domain/
+    └── OrderFlow.Notifications.Infrastructure/
+OrderFlow.IntegrationEvents/
+tests/
+scripts/
+deploy/
+.github/workflows/
+```
+
+Четырёхслойная структура повторяется для каждого микросервиса. Функциональность внутри Application и Api сгруппирована по use case.
+
+## Бизнес-операции
+
+- **Catalog:** управление категориями и товарами, изменение цены, данных и статуса товара.
+- **Inventory:** управление складами и остатками, резервирование и освобождение товаров. Конкурентные изменения защищены PostgreSQL `xmin`.
+- **Ordering:** создание заказа со снимками товаров и адресом доставки, расчёт суммы, чтение и отмена. Начальный статус — `PendingInventory`.
+- **Payments:** регистрация результата платежа и возвраты. Уникальность `OrderId` защищает от повторного создания платежа для одного заказа.
+- **Notifications:** сохранение истории уведомлений и попыток доставки, отправка и повторная обработка через logging-адаптер.
+
+Платёжный адаптер имитирует результат обработки; реальные списания и отправка email/SMS не выполняются. Создание заказа пока не запускает завершённый распределённый процесс резервирования и оплаты.
+
+## Запуск
+
+Требуются .NET 10 SDK для локальной разработки и Docker с Compose для контейнерного окружения. Команды выполняются из корня репозитория.
+
+### Сборка .NET
 
 ```powershell
 dotnet tool restore
-dotnet restore
+dotnet restore OrderFlow.slnx
 dotnet build OrderFlow.slnx
-$env:ConnectionStrings__CatalogDatabase = "Host=localhost;Port=5433;Database=catalog;Username=orderflow;Password=orderflow_dev_only"
-dotnet ef database update --project src/Services/Catalog/OrderFlow.Catalog.Infrastructure --startup-project src/Services/Catalog/OrderFlow.Catalog.Infrastructure
-dotnet run --project src/Services/Catalog/OrderFlow.Catalog.Api
 ```
 
-Repeat with Inventory, Ordering, Payments and Notifications, replacing service name, database and port from the table. EF design-time factories require the corresponding ConnectionStrings__<Service>Database variable. No schema changes run on normal API startup.
+### Docker Compose
 
-## Workflow B: Docker Compose
-
-Development defaults are in .env.example; copy it to .env if customizing credentials. Do not use these credentials outside local development.
+Настройки PostgreSQL по умолчанию приведены в `.env.example`. Для переопределения создайте `.env`; локальные пароли не подходят для production.
 
 ```powershell
 docker compose config --quiet
 docker compose build
-docker compose up -d --wait catalog-postgres inventory-postgres ordering-postgres payments-postgres notifications-postgres
+docker compose up -d --wait catalog-db inventory-db ordering-db payments-db notifications-db
 ./scripts/apply-migrations.ps1
 docker compose up -d
-Invoke-RestMethod http://localhost:5001/health/live
-Invoke-RestMethod http://localhost:5001/health/ready
+./scripts/create-kafka-topics.ps1
 ```
 
-On Linux/macOS use `sh scripts/apply-migrations.sh`. The scripts explicitly run each built API with --migrate and exit; migrations never run during normal API startup. Container DNS uses <service>-postgres, not localhost. Each PostgreSQL instance has its own volume mounted at /var/lib/postgresql, suitable for the PostgreSQL 18 image.
+Перед созданием топиков дождитесь готовности Kafka. Скрипт создаёт `orderflow.order.created`; автоматическое создание топиков в брокере отключено.
 
-## Local business scenarios
+На Linux/macOS миграции применяются через `sh scripts/apply-migrations.sh`. Скрипты запускают API с аргументом `--migrate` и завершают процесс после обновления схемы. При обычном старте API миграции **не применяются автоматически**.
 
-Catalog preserves SKU/category invariants. Create a category before a product. Product updates include Price; DELETE physically removes the local product.
+Для запуска одной командой используйте `./scripts/start.ps1`: скрипт собирает образы, запускает инфраструктуру, применяет миграции и ожидает готовности API. Если образы уже собраны, используйте `./scripts/start.ps1 -SkipBuild`. Создание Kafka-топиков остаётся отдельным шагом.
 
-Inventory preserves the existing warehouse/SKU model. Create a warehouse first, then POST /api/inventory with ProductId, WarehouseId, Sku and Quantity. ProductId is globally unique within Inventory. Quantity cannot fall below ReservedQuantity; deletion with reservations is rejected. PostgreSQL xmin protects concurrent stock writes; callers receive 409 and must reload before retrying.
+### Запуск из Rider
 
-Create an order with CustomerId, CustomerEmail, Line1, City, PostalCode, Country and Items (ProductId, ProductName, UnitPrice, Quantity). Items are required, totals are calculated and the order enters PendingInventory. Product snapshots are trusted locally; Catalog verification is deferred. Internal MarkInventoryReservedCommand → MarkPaymentProcessingCommand → ConfirmOrderCommand enforce transitions. CancelOrderCommand provides cancellation. No remote inventory/payment action is triggered.
+Для контейнерного окружения выбирайте конфигурацию **Docker Compose** с корневым `docker-compose.yml`, а не отдельный `OrderFlow.Catalog.Api/Dockerfile`. Перед первым запуском выполните `./scripts/start.ps1` в терминале Rider, чтобы подготовить базы и миграции.
 
-POST /api/payments accepts OrderId, Amount, optional Method (Card) and SimulateFailure. It records a simulated succeeded/failed payment atomically; OrderId is unique. No Ordering call occurs. Older explicit processing/status endpoints apply only to a compatible local payment state.
+Отдельный Dockerfile собирает образ, но не передаёт настройки из Compose и не подключает контейнер к его сети. Ошибка `ConnectionStrings:CatalogDatabase is required` означает, что строка подключения не была передана. Compose задаёт `ConnectionStrings__CatalogDatabase`, подключает API к сети с `catalog-db` и публикует порт 5001. Не запускайте второй экземпляр API на том же порту; для работы с текущим окружением откройте [Catalog Scalar](http://localhost:5001/scalar).
 
-POST /api/notifications accepts OrderId, CustomerId, NotificationType, Recipient, Subject, Body and optional Channel (Email). It records history and logs identifiers. Existing send/retry operations use a logging-only adapter and delivery-attempt history.
+Внутри Compose PostgreSQL доступен по именам `<service>-db`. Порты баз данных на хост не опубликованы. Каждая база хранит данные в отдельном volume. Compose также содержит Kafka и OpenTelemetry Collector.
 
-## Tests
+### Локальный запуск API
+
+Нужен доступный с хоста PostgreSQL с отдельной базой каждого сервиса. Пример для Ordering и PostgreSQL на порту 5432:
+
+```powershell
+$env:ConnectionStrings__OrderingDatabase = "Host=localhost;Port=5432;Database=ordering;Username=orderflow;Password=<password>"
+$env:Kafka__BootstrapServers = "localhost:9092"
+$env:Kafka__OrderCreatedTopic = "orderflow.order.created"
+$env:ASPNETCORE_ENVIRONMENT = "Development"
+
+dotnet ef database update --project src/Services/Ordering/OrderFlow.Ordering.Infrastructure --startup-project src/Services/Ordering/OrderFlow.Ordering.Infrastructure
+dotnet run --project src/Services/Ordering/OrderFlow.Ordering.Api --no-launch-profile --urls http://localhost:5003
+```
+
+Для остальных сервисов используются `ConnectionStrings__CatalogDatabase`, `ConnectionStrings__InventoryDatabase`, `ConnectionStrings__PaymentsDatabase` и `ConnectionStrings__NotificationsDatabase`. Не запускайте локальный API на порту уже работающего контейнера.
+
+## Пример создания заказа
+
+Отправьте `POST http://localhost:5003/api/orders` с `Content-Type: application/json`:
+
+```json
+{
+  "customerId": "7ec77abe-8ae5-445d-885f-a214ef8fb102",
+  "customerEmail": "buyer@example.com",
+  "line1": "15 Main Street",
+  "city": "Warsaw",
+  "postalCode": "00-001",
+  "country": "PL",
+  "items": [
+    {
+      "productId": "a3f26e40-7c6a-4d67-b55a-8a6d94b8a101",
+      "productName": "Mechanical Keyboard",
+      "unitPrice": 129.99,
+      "quantity": 2
+    }
+  ]
+}
+```
+
+Успешный ответ — `201 Created`, сумма заказа — `259.98`. Полученный `id` используется в `GET /api/orders/{id}`. Email передаётся обычной строкой, без Markdown-ссылки. Данные товаров пока не сверяются с Catalog.
+
+## API и диагностика
+
+| Путь | Назначение |
+| --- | --- |
+| `/scalar` | Интерактивная документация и выполнение запросов |
+| `/openapi/v1.json` | OpenAPI-контракт |
+| `/health/live` | Проверка работоспособности процесса |
+| `/health/ready` | Проверка соединения с PostgreSQL сервиса |
+
+Списки поддерживают `Page` и `PageSize`: по умолчанию 1 и 20, максимальный размер страницы — 100. Ошибки возвращаются в формате ProblemDetails: `400` для валидации, `404` для отсутствующих ресурсов, `409` для конфликтов и `500` для непредвиденных исключений.
+
+### Ошибка отсутствующей таблицы
+
+PostgreSQL `42P01: relation "orders" does not exist` означает, что требуемой таблицы нет в подключённой базе. Для нового окружения примените миграции:
+
+```powershell
+./scripts/apply-migrations.ps1
+Invoke-RestMethod "http://localhost:5003/api/orders?page=1&pageSize=10"
+```
+
+Health check проверяет соединение, а не схему, поэтому может возвращать `200` до применения миграций. Не удаляйте volumes для устранения этой ошибки. Если база создана старой несовместимой версией схемы, сначала проверьте историю миграций и сделайте резервную копию.
+
+## Тестирование и CI
 
 ```powershell
 dotnet test OrderFlow.slnx
+
+# Интеграционные тесты с настоящим PostgreSQL
 $env:RUN_DOCKER_TESTS = "true"
 dotnet test tests/Architecture/OrderFlow.Infrastructure.IntegrationTests
 ```
 
-PostgreSQL tests create isolated disposable Testcontainers: product persistence, order items, inventory uniqueness/reservations/concurrency, payment order uniqueness and notification history. No developer database or EF InMemory provider is used. Set RUN_DOCKER_TESTS only with Docker running; otherwise container tests are explicitly skipped.
+Unit tests проверяют доменные правила и обработчики. Integration tests используют изолированные PostgreSQL-контейнеры через Testcontainers: сохранение агрегатов, позиции заказа, уникальность, резервирование и конкурентные изменения. Без `RUN_DOCKER_TESTS=true` контейнерные тесты пропускаются.
 
-## Migration reset and limitations
+GitHub Actions содержит workflows для сборки и тестов .NET, проверки Compose и сборки контейнерных образов.
 
-This educational pre-Kafka baseline replaces previous development migrations with InitialCreate. Use fresh databases/volumes. Do not apply this baseline to databases created by the previous distributed version; no destructive reset is automated.
+## Событийное взаимодействие и ограничения
 
-Authentication/authorization, real payment/email integrations, cross-service checks and distributed consistency are intentionally absent. HTTP contracts include existing SKU/category, warehouse and shipping details. Docker runtime verification requires a running Docker daemon.
+Ordering содержит Kafka producer для `OrderCreatedIntegrationEvent`. Ключ сообщения — `OrderId`, адрес брокера и топик задаются конфигурацией. Сейчас отправка выполняется после сохранения заказа: ошибка Kafka может привести к HTTP 500 при уже сохранённом заказе.
 
-The selected MediatR version prints a licensing notice: development/testing is permitted by that notice; production use requires reviewing its licensing terms. Existing OpenTelemetry exporters are retained; configure an OTLP collector explicitly if telemetry export is needed (no collector is included in Compose).
+Transactional Outbox, consumers и Saga для сквозного процесса заказа пока не реализованы. Атомарность записи в PostgreSQL и публикации в Kafka не гарантируется. Аутентификация, авторизация и интеграции с реальными платёжными и почтовыми провайдерами остаются отдельными направлениями развития.
 
-See [verification report](docs/pre-kafka-verification.md) for the checks performed and remaining runtime limitations.
+Перед production-развёртыванием необходимы настройка секретов, контроль доступа, надёжная доставка событий и проверка лицензий используемых зависимостей.
