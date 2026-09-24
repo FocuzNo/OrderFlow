@@ -1,3 +1,4 @@
+using OrderFlow.Ordering.Application.Abstractions.Messaging;
 using OrderFlow.Ordering.Application.Abstractions.Persistence;
 using OrderFlow.Ordering.Application.Orders;
 using OrderFlow.Ordering.Domain.Orders;
@@ -11,19 +12,31 @@ public sealed class CreateOrderTests
     {
         var repository = new Repository();
         var commit = new Commit();
+        var publisher = new OrderCreatedPublisher();
+
         var command = new OrderFeatures.CreateOrderCommand(
             Guid.NewGuid(),
             "buyer@example.test",
             new("Main", "Minsk", "220000", "BY"),
             [new(Guid.NewGuid(), "Notebook", 5, 3)]
         );
-        var response = await new OrderFeatures.CreateOrderCommandHandler(repository, commit).Handle(
-            command,
-            default
+
+        var handler = new OrderFeatures.CreateOrderCommandHandler(
+            repository,
+            commit,
+            publisher
         );
+
+        var response = await handler.Handle(
+            command,
+            CancellationToken.None
+        );
+
         Assert.Equal(15, repository.Entity!.TotalAmount);
         Assert.Equal(1, commit.Count);
+        Assert.Equal(1, publisher.Count);
         Assert.Equal(repository.Entity.Id, response.Id);
+        Assert.Equal(repository.Entity.Id, publisher.Order!.Id);
     }
 
     [Fact]
@@ -35,7 +48,12 @@ public sealed class CreateOrderTests
             null!,
             []
         );
-        Assert.False(new CreateOrderCommandValidator().Validate(command).IsValid);
+
+        Assert.False(
+            new CreateOrderCommandValidator()
+                .Validate(command)
+                .IsValid
+        );
     }
 
     [Fact]
@@ -48,16 +66,23 @@ public sealed class CreateOrderTests
             [null!]
         );
 
-        Assert.False(new CreateOrderCommandValidator().Validate(command).IsValid);
+        Assert.False(
+            new CreateOrderCommandValidator()
+                .Validate(command)
+                .IsValid
+        );
     }
 
     private sealed class Commit : IUnitOfWork
     {
         public int Count { get; private set; }
 
-        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        public Task<int> SaveChangesAsync(
+            CancellationToken cancellationToken = default
+        )
         {
             Count++;
+
             return Task.FromResult(1);
         }
     }
@@ -66,24 +91,51 @@ public sealed class CreateOrderTests
     {
         public Order? Entity { get; private set; }
 
-        public Task AddAsync(Order entity, CancellationToken cancellationToken)
+        public Task AddAsync(
+            Order entity,
+            CancellationToken cancellationToken
+        )
         {
             Entity = entity;
+
             return Task.CompletedTask;
         }
 
-        public Task<Order?> GetByIdAsync(Guid id, CancellationToken cancellationToken) =>
+        public Task<Order?> GetByIdAsync(
+            Guid id,
+            CancellationToken cancellationToken
+        ) =>
             Task.FromResult(Entity);
 
         public Task<IReadOnlyList<Order>> ListAsync(
             int page,
             int pageSize,
             CancellationToken cancellationToken
-        ) => Task.FromResult<IReadOnlyList<Order>>([]);
+        ) =>
+            Task.FromResult<IReadOnlyList<Order>>([]);
 
         public Task<IReadOnlyList<Order>> GetCustomerOrdersAsync(
             Guid customerId,
             CancellationToken cancellationToken
-        ) => Task.FromResult<IReadOnlyList<Order>>([]);
+        ) =>
+            Task.FromResult<IReadOnlyList<Order>>([]);
+    }
+
+    private sealed class OrderCreatedPublisher : IOrderCreatedPublisher
+    {
+        public int Count { get; private set; }
+
+        public Order? Order { get; private set; }
+
+        public Task PublishAsync(
+            Order order,
+            CancellationToken cancellationToken
+        )
+        {
+            Count++;
+            Order = order;
+
+            return Task.CompletedTask;
+        }
     }
 }
