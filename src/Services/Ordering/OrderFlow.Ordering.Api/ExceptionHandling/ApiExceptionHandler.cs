@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using OrderFlow.Ordering.Application.Abstractions.Errors;
@@ -13,7 +14,7 @@ public sealed class ApiExceptionHandler : IExceptionHandler
         CancellationToken cancellationToken
     )
     {
-        if (exception is ValidationException validationException)
+        if (exception is FluentValidation.ValidationException validationException)
         {
             await Results
                 .ValidationProblem(

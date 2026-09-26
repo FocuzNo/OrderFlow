@@ -71,6 +71,9 @@ services:
     ordering-db:
         <<: *postgres
 
+        ports:
+            - "5435:5432"
+
         environment:
             POSTGRES_USER: ${POSTGRES_USER:-orderflow}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orderflow_dev_only}
