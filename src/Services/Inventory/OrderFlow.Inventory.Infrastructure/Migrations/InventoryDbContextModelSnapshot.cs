@@ -130,6 +130,29 @@ namespace OrderFlow.Inventory.Infrastructure.Migrations
                     b.ToTable("warehouses", (string)null);
                 });
 
+            modelBuilder.Entity("OrderFlow.Inventory.Infrastructure.Persistence.Inbox.InboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("processed_at");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inbox_messages");
+
+                    b.ToTable("inbox_messages", (string)null);
+                });
+
             modelBuilder.Entity("OrderFlow.Inventory.Domain.Reservations.StockReservation", b =>
                 {
                     b.HasOne("OrderFlow.Inventory.Domain.Stock.StockItem", null)
