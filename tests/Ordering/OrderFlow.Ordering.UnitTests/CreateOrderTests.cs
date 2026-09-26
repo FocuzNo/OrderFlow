@@ -12,7 +12,7 @@ public sealed class CreateOrderTests
     {
         var repository = new Repository();
         var commit = new Commit();
-        var publisher = new OrderCreatedPublisher();
+        var outboxWriter = new OrderCreatedOutboxWriter();
 
         var command = new OrderFeatures.CreateOrderCommand(
             Guid.NewGuid(),
@@ -24,7 +24,7 @@ public sealed class CreateOrderTests
         var handler = new OrderFeatures.CreateOrderCommandHandler(
             repository,
             commit,
-            publisher
+            outboxWriter
         );
 
         var response = await handler.Handle(
@@ -32,11 +32,30 @@ public sealed class CreateOrderTests
             CancellationToken.None
         );
 
-        Assert.Equal(15, repository.Entity!.TotalAmount);
-        Assert.Equal(1, commit.Count);
-        Assert.Equal(1, publisher.Count);
-        Assert.Equal(repository.Entity.Id, response.Id);
-        Assert.Equal(repository.Entity.Id, publisher.Order!.Id);
+        Assert.Equal(
+            15,
+            repository.Entity!.TotalAmount
+        );
+
+        Assert.Equal(
+            1,
+            commit.Count
+        );
+
+        Assert.Equal(
+            1,
+            outboxWriter.Count
+        );
+
+        Assert.Equal(
+            repository.Entity.Id,
+            response.Id
+        );
+
+        Assert.Equal(
+            repository.Entity.Id,
+            outboxWriter.Order!.Id
+        );
     }
 
     [Fact]
@@ -121,21 +140,19 @@ public sealed class CreateOrderTests
             Task.FromResult<IReadOnlyList<Order>>([]);
     }
 
-    private sealed class OrderCreatedPublisher : IOrderCreatedPublisher
+    private sealed class OrderCreatedOutboxWriter
+        : IOrderCreatedOutboxWriter
     {
         public int Count { get; private set; }
 
         public Order? Order { get; private set; }
 
-        public Task PublishAsync(
-            Order order,
-            CancellationToken cancellationToken
+        public void Add(
+            Order order
         )
         {
             Count++;
             Order = order;
-
-            return Task.CompletedTask;
         }
     }
 }

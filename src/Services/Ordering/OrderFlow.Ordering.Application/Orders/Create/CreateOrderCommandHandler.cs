@@ -9,8 +9,8 @@ public static partial class OrderFeatures
     public sealed class CreateOrderCommandHandler(
         IOrderRepository repository,
         IUnitOfWork unitOfWork,
-        IOrderCreatedPublisher orderCreatedPublisher)
-        : IRequestHandler<CreateOrderCommand, OrderResponse>
+        IOrderCreatedOutboxWriter outboxWriter
+    ) : IRequestHandler<CreateOrderCommand, OrderResponse>
     {
         public async Task<OrderResponse> Handle(
             CreateOrderCommand command,
@@ -23,30 +23,37 @@ public static partial class OrderFeatures
                 command.ShippingAddress.PostalCode,
                 command.ShippingAddress.Country
             );
+
+            var items = command.Items
+                .Select(item =>
+                    OrderItem.Create(
+                        item.ProductId,
+                        item.ProductName,
+                        item.UnitPrice,
+                        item.Quantity
+                    )
+                )
+                .ToArray();
+
             var entity = Order.Create(
                 command.CustomerId,
                 command.CustomerEmail,
                 shippingAddress,
-                command
-                    .Items.Select(item =>
-                        OrderItem.Create(
-                            item.ProductId,
-                            item.ProductName,
-                            item.UnitPrice,
-                            item.Quantity
-                        )
-                    )
-                    .ToArray()
+                items
             );
+
             await repository.AddAsync(
                 entity,
-                cancellationToken);
+                cancellationToken
+            );
 
-            await unitOfWork.SaveChangesAsync(cancellationToken);
+            outboxWriter.Add(
+                entity
+            );
 
-            await orderCreatedPublisher.PublishAsync(
-                entity,
-                cancellationToken);
+            await unitOfWork.SaveChangesAsync(
+                cancellationToken
+            );
 
             return Map(entity);
         }

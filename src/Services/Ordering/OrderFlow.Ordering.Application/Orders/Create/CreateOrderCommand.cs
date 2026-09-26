@@ -1,7 +1,4 @@
-using OrderFlow.Ordering.Application.Abstractions.Errors;
 using OrderFlow.Ordering.Application.Abstractions.Messaging;
-using OrderFlow.Ordering.Application.Abstractions.Persistence;
-using OrderFlow.Ordering.Domain.Orders;
 
 namespace OrderFlow.Ordering.Application.Orders;
 
@@ -11,6 +8,5 @@ public static partial class OrderFeatures
         Guid CustomerId,
         string CustomerEmail,
         ShippingAddressInput ShippingAddress,
-        IReadOnlyList<OrderItemInput> Items
-    ) : ICommand<OrderResponse>;
+        IReadOnlyList<OrderItemInput> Items) : ICommand<OrderResponse>;
 }
