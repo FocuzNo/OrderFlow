@@ -2,10 +2,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OrderFlow.Ordering.Infrastructure.Messaging.Kafka;
-using OrderFlow.Ordering.Infrastructure.Persistence;
+using OrderFlow.Inventory.Infrastructure.Messaging.Kafka;
+using OrderFlow.Inventory.Infrastructure.Persistence;
 
-namespace OrderFlow.Ordering.Infrastructure.Messaging.Outbox;
+namespace OrderFlow.Inventory.Infrastructure.Messaging.Outbox;
 
 public sealed class OutboxProcessor(
     IServiceScopeFactory scopeFactory,
@@ -38,7 +38,7 @@ public sealed class OutboxProcessor(
     public async Task ProcessBatchAsync(CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
-        var databaseContext = scope.ServiceProvider.GetRequiredService<OrderingDbContext>();
+        var databaseContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
         var outboxOptions = options.Value;
 
         // Locks prevent concurrent workers from publishing the same rows in parallel.

@@ -2,6 +2,8 @@ using OrderFlow.Inventory.Application.Abstractions.Persistence;
 using OrderFlow.Inventory.Domain.Reservations;
 using OrderFlow.Inventory.Domain.Stock;
 using OrderFlow.Inventory.Domain.Warehouses;
+using OrderFlow.Inventory.Infrastructure.Persistence.Inbox;
+using OrderFlow.Inventory.Infrastructure.Persistence.Outbox;
 
 namespace OrderFlow.Inventory.Infrastructure.Persistence;
 
@@ -14,6 +16,12 @@ public sealed class InventoryDbContext(DbContextOptions<InventoryDbContext> opti
     public DbSet<StockItem> StockItems => Set<StockItem>();
 
     public DbSet<StockReservation> Reservations => Set<StockReservation>();
+
+    public DbSet<InboxMessage> InboxMessages =>
+        Set<InboxMessage>();
+
+    public DbSet<OutboxMessage> OutboxMessages =>
+        Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder) =>
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(InventoryDbContext).Assembly);

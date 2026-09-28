@@ -6,19 +6,52 @@ using OrderFlow.Inventory.Infrastructure.Persistence.Repositories;
 
 namespace OrderFlow.Inventory.Infrastructure.Persistence;
 
-public sealed class InventoryRepository(InventoryDbContext databaseContext)
-    : Repository<StockItem>(databaseContext),
-        IInventoryRepository
+public sealed class InventoryRepository(
+    InventoryDbContext databaseContext
+) : Repository<StockItem>(databaseContext),
+    IInventoryRepository
 {
-    public void Remove(Warehouse warehouse) => DatabaseContext.Warehouses.Remove(warehouse);
+    public void Remove(
+        Warehouse warehouse
+    ) =>
+        DatabaseContext.Warehouses.Remove(
+            warehouse
+        );
 
     public Task<StockItem?> GetByProductIdAsync(
         Guid productId,
         CancellationToken cancellationToken
     ) =>
         DatabaseContext
-            .StockItems.Include(stock => stock.Reservations)
-            .SingleOrDefaultAsync(stock => stock.ProductId == productId, cancellationToken);
+            .StockItems
+            .Include(stock =>
+                stock.Reservations
+            )
+            .SingleOrDefaultAsync(
+                stock =>
+                    stock.ProductId == productId,
+                cancellationToken
+            );
+
+    public async Task<IReadOnlyCollection<StockItem>> GetByProductIdsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        CancellationToken cancellationToken
+    )
+    {
+        return await DatabaseContext
+            .StockItems
+            .Include(stockItem =>
+                stockItem.Reservations
+            )
+            .Where(stockItem =>
+                productIds.Contains(
+                    stockItem.ProductId
+                )
+            )
+            .ToListAsync(
+                cancellationToken
+            );
+    }
 
     public async Task<IReadOnlyList<StockItem>> ListAsync(
         int page,
@@ -26,17 +59,35 @@ public sealed class InventoryRepository(InventoryDbContext databaseContext)
         CancellationToken cancellationToken
     ) =>
         await DatabaseContext
-            .StockItems.AsNoTracking()
-            .Include(stock => stock.Reservations)
-            .OrderBy(entity => entity.Id)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(cancellationToken);
+            .StockItems
+            .AsNoTracking()
+            .Include(stock =>
+                stock.Reservations
+            )
+            .OrderBy(entity =>
+                entity.Id
+            )
+            .Skip(
+                (page - 1) * pageSize
+            )
+            .Take(
+                pageSize
+            )
+            .ToListAsync(
+                cancellationToken
+            );
 
-    public Task AddAsync(Warehouse candidate, CancellationToken cancellationToken)
+    public Task AddAsync(
+        Warehouse candidate,
+        CancellationToken cancellationToken
+    )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        DatabaseContext.Warehouses.Add(candidate);
+
+        DatabaseContext.Warehouses.Add(
+            candidate
+        );
+
         return Task.CompletedTask;
     }
 
@@ -44,9 +95,14 @@ public sealed class InventoryRepository(InventoryDbContext databaseContext)
         CancellationToken cancellationToken
     ) =>
         await DatabaseContext
-            .Warehouses.AsNoTracking()
-            .OrderBy(candidate => candidate.Name)
-            .ToListAsync(cancellationToken);
+            .Warehouses
+            .AsNoTracking()
+            .OrderBy(candidate =>
+                candidate.Name
+            )
+            .ToListAsync(
+                cancellationToken
+            );
 
     public Task<StockItem?> GetStockAsync(
         Guid productId,
@@ -54,10 +110,14 @@ public sealed class InventoryRepository(InventoryDbContext databaseContext)
         CancellationToken cancellationToken
     ) =>
         DatabaseContext
-            .StockItems.Include(candidate => candidate.Reservations)
+            .StockItems
+            .Include(candidate =>
+                candidate.Reservations
+            )
             .SingleOrDefaultAsync(
                 candidate =>
-                    candidate.ProductId == productId && candidate.WarehouseId == warehouseId,
+                    candidate.ProductId == productId
+                    && candidate.WarehouseId == warehouseId,
                 cancellationToken
             );
 
@@ -66,6 +126,11 @@ public sealed class InventoryRepository(InventoryDbContext databaseContext)
         CancellationToken cancellationToken
     ) =>
         DatabaseContext
-            .Reservations.AsNoTracking()
-            .SingleOrDefaultAsync(candidate => candidate.Id == id, cancellationToken);
+            .Reservations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                candidate =>
+                    candidate.Id == id,
+                cancellationToken
+            );
 }

@@ -1,6 +1,7 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 COPY Directory.Build.props global.json ./
+COPY OrderFlow.IntegrationEvents/ OrderFlow.IntegrationEvents/
 COPY src/Services/Inventory/ src/Services/Inventory/
 RUN dotnet restore src/Services/Inventory/OrderFlow.Inventory.Api/OrderFlow.Inventory.Api.csproj
 RUN dotnet publish src/Services/Inventory/OrderFlow.Inventory.Api/OrderFlow.Inventory.Api.csproj -c Release --no-restore -o /app /p:UseAppHost=false
