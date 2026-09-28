@@ -1,127 +1,70 @@
-﻿using System.Text.Json;
+using System.Text;
+using System.Text.Json;
 using Confluent.Kafka;
-using Microsoft.EntityFrameworkCore;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OrderFlow.IntegrationEvents.Orders;
-using OrderFlow.Inventory.Infrastructure.Persistence;
-using OrderFlow.Inventory.Infrastructure.Persistence.Inbox;
+using OrderFlow.Inventory.Application.Inventory;
 
 namespace OrderFlow.Inventory.Infrastructure.Messaging.Kafka;
 
 public sealed class OrderCreatedKafkaConsumer(
     IOptions<KafkaOptions> options,
     IServiceScopeFactory scopeFactory,
+    IKafkaPublisher kafkaPublisher,
     ILogger<OrderCreatedKafkaConsumer> logger
 ) : BackgroundService
 {
-    protected override Task ExecuteAsync(
-        CancellationToken stoppingToken
-    )
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        return Task.Run(
-            () => Consume(
-                stoppingToken
-            ),
-            stoppingToken
-        );
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await ConsumeAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception exception)
+            {
+                // Rejoin from committed offsets. Never consume past an uncommitted failure.
+                logger.LogError(exception, "Inventory consumer disconnected; retrying from committed offsets");
+                await Task.Delay(options.Value.RetryDelayMilliseconds, stoppingToken);
+            }
+        }
     }
 
-    private void Consume(
-        CancellationToken cancellationToken
-    )
+    private async Task ConsumeAsync(CancellationToken cancellationToken)
     {
-        var kafkaOptions =
-            options.Value;
+        var kafkaOptions = options.Value;
+        using var consumer = new ConsumerBuilder<string, string>(new ConsumerConfig
+        {
+            BootstrapServers = kafkaOptions.BootstrapServers,
+            GroupId = kafkaOptions.ConsumerGroup,
+            AutoOffsetReset = AutoOffsetReset.Earliest,
+            EnableAutoCommit = false,
+            EnableAutoOffsetStore = false,
+            MaxPollIntervalMs = kafkaOptions.MaxPollIntervalMilliseconds,
+        }).Build();
 
-        var consumerConfig =
-            new ConsumerConfig
-            {
-                BootstrapServers =
-                    kafkaOptions.BootstrapServers,
-
-                GroupId =
-                    kafkaOptions.ConsumerGroup,
-
-                AutoOffsetReset =
-                    AutoOffsetReset.Earliest,
-
-                EnableAutoCommit =
-                    false,
-            };
-
-        using var consumer =
-            new ConsumerBuilder<string, string>(
-                consumerConfig
-            )
-            .Build();
-
-        consumer.Subscribe(
-            kafkaOptions.OrderCreatedTopic
-        );
-
-        logger.LogInformation(
-            "Kafka consumer started. Topic: {Topic}, Group: {ConsumerGroup}",
-            kafkaOptions.OrderCreatedTopic,
-            kafkaOptions.ConsumerGroup
-        );
+        consumer.Subscribe(kafkaOptions.OrderCreatedTopic);
 
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
-                var consumeResult =
-                    consumer.Consume(
-                        cancellationToken
-                    );
+                var consumedMessage = consumer.Consume(cancellationToken);
+                await ProcessWithRetryAsync(consumedMessage, cancellationToken);
 
-                try
-                {
-                    ProcessMessageAsync(
-                            consumeResult,
-                            cancellationToken
-                        )
-                        .GetAwaiter()
-                        .GetResult();
-
-                    consumer.Commit(
-                        consumeResult
-                    );
-
-                    logger.LogInformation(
-                        "Committed Kafka offset {Offset} for partition {Partition}",
-                        consumeResult.Offset.Value,
-                        consumeResult.Partition.Value
-                    );
-                }
-                catch (JsonException exception)
-                {
-                    logger.LogError(
-                        exception,
-                        "Failed to deserialize OrderCreated event at partition {Partition}, offset {Offset}",
-                        consumeResult.Partition.Value,
-                        consumeResult.Offset.Value
-                    );
-                }
-                catch (Exception exception)
-                {
-                    logger.LogError(
-                        exception,
-                        "Failed to process OrderCreated message at partition {Partition}, offset {Offset}",
-                        consumeResult.Partition.Value,
-                        consumeResult.Offset.Value
-                    );
-                }
+                // Processing either committed Inbox + business state + Outbox, or Kafka acknowledged DLT.
+                // A commit failure reconnects; Inbox protects redelivery after a successful DB commit.
+                consumer.Commit(consumedMessage);
             }
-        }
-        catch (OperationCanceledException)
-            when (cancellationToken.IsCancellationRequested)
-        {
-            logger.LogInformation(
-                "Kafka consumer is stopping"
-            );
         }
         finally
         {
@@ -129,85 +72,88 @@ public sealed class OrderCreatedKafkaConsumer(
         }
     }
 
-    private async Task ProcessMessageAsync(
-        ConsumeResult<string, string> consumeResult,
+    public async Task ProcessWithRetryAsync(
+        ConsumeResult<string, string> consumedMessage,
         CancellationToken cancellationToken
     )
     {
-        var integrationEvent =
-            JsonSerializer.Deserialize<OrderCreatedIntegrationEvent>(
-                consumeResult.Message.Value
-            );
+        var kafkaOptions = options.Value;
 
-        if (integrationEvent is null)
+        for (var attempt = 0; ; attempt++)
         {
-            throw new JsonException(
-                "OrderCreatedIntegrationEvent is null."
-            );
-        }
-
-        await using var scope =
-            scopeFactory.CreateAsyncScope();
-
-        var dbContext =
-            scope.ServiceProvider
-                .GetRequiredService<InventoryDbContext>();
-
-        var alreadyProcessed =
-            await dbContext.InboxMessages
-                .AnyAsync(
-                    message =>
-                        message.Id == integrationEvent.EventId,
-                    cancellationToken
+            try
+            {
+                await ProcessAsync(consumedMessage, cancellationToken);
+                return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    exception,
+                    "Inventory processing failed for {Topic}/{Partition}/{Offset}, attempt {Attempt}",
+                    consumedMessage.Topic,
+                    consumedMessage.Partition.Value,
+                    consumedMessage.Offset.Value,
+                    attempt + 1
                 );
 
-        if (alreadyProcessed)
-        {
-            logger.LogInformation(
-                "Skipping duplicate OrderCreated event {EventId} for order {OrderId}",
-                integrationEvent.EventId,
-                integrationEvent.OrderId
-            );
+                if (attempt >= kafkaOptions.ProcessingMaxRetries)
+                {
+                    var headers = new Headers();
+                    if (consumedMessage.Message.Headers is not null)
+                    {
+                        foreach (var header in consumedMessage.Message.Headers)
+                            headers.Add(header.Key, header.GetValueBytes());
+                    }
 
-            return;
+                    headers.Add("original-topic", Encoding.UTF8.GetBytes(consumedMessage.Topic));
+                    headers.Add("original-partition", Encoding.UTF8.GetBytes(consumedMessage.Partition.Value.ToString()));
+                    headers.Add("original-offset", Encoding.UTF8.GetBytes(consumedMessage.Offset.Value.ToString()));
+                    headers.Add("error-type", Encoding.UTF8.GetBytes(exception.GetType().Name));
+
+                    // Keep original key and payload. If DLT fails, propagate: no source offset commit.
+                    await kafkaPublisher.PublishAsync(
+                        kafkaOptions.OrderCreatedDeadLetterTopic,
+                        consumedMessage.Message.Key,
+                        consumedMessage.Message.Value,
+                        cancellationToken,
+                        headers
+                    );
+                    return;
+                }
+
+                await Task.Delay(kafkaOptions.RetryDelayMilliseconds, cancellationToken);
+            }
         }
+    }
 
-        logger.LogInformation(
-            "Processing OrderCreated event {EventId} for order {OrderId}. Partition: {Partition}, Offset: {Offset}",
-            integrationEvent.EventId,
-            integrationEvent.OrderId,
-            consumeResult.Partition.Value,
-            consumeResult.Offset.Value
-        );
+    private async Task ProcessAsync(
+        ConsumeResult<string, string> consumedMessage,
+        CancellationToken cancellationToken
+    )
+    {
+        var integrationEvent = JsonSerializer.Deserialize<OrderCreatedIntegrationEvent>(
+            consumedMessage.Message.Value ?? throw new JsonException("OrderCreated payload is null.")
+        ) ?? throw new JsonException("OrderCreated payload is null.");
 
-        foreach (var item in integrationEvent.Items)
-        {
-            logger.LogInformation(
-                "Order {OrderId} contains product {ProductId}, quantity {Quantity}",
+        if (integrationEvent.Items is null || integrationEvent.Items.Any(item => item is null))
+            throw new JsonException("OrderCreated items must not contain null values.");
+
+        await using var scope = scopeFactory.CreateAsyncScope();
+        var sender = scope.ServiceProvider.GetRequiredService<ISender>();
+        await sender.Send(
+            new ReserveOrderInventoryCommand(
+                integrationEvent.EventId,
                 integrationEvent.OrderId,
-                item.ProductId,
-                item.Quantity
-            );
-        }
-
-        var inboxMessage =
-            InboxMessage.Create(
-                integrationEvent.EventId,
-                nameof(OrderCreatedIntegrationEvent),
-                DateTimeOffset.UtcNow
-            );
-
-        dbContext.InboxMessages.Add(
-            inboxMessage
-        );
-
-        await dbContext.SaveChangesAsync(
+                integrationEvent.Items.Select(item =>
+                    new ReserveOrderInventoryItem(item.ProductId, item.Quantity)
+                ).ToArray()
+            ),
             cancellationToken
-        );
-
-        logger.LogInformation(
-            "Stored event {EventId} in Inbox",
-            integrationEvent.EventId
         );
     }
 }

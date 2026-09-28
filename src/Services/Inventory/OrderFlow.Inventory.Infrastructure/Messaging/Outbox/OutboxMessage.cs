@@ -1,4 +1,4 @@
-namespace OrderFlow.Ordering.Infrastructure.Persistence.Outbox;
+namespace OrderFlow.Inventory.Infrastructure.Persistence.Outbox;
 
 public sealed class OutboxMessage
 {
@@ -8,13 +8,17 @@ public sealed class OutboxMessage
 
     public Guid Id { get; private set; }
 
-    public string Topic { get; private set; } = string.Empty;
+    public string Topic { get; private set; } =
+        string.Empty;
 
-    public string Type { get; private set; } = string.Empty;
+    public string Type { get; private set; } =
+        string.Empty;
 
-    public string Key { get; private set; } = string.Empty;
+    public string Key { get; private set; } =
+        string.Empty;
 
-    public string Content { get; private set; } = string.Empty;
+    public string Content { get; private set; } =
+        string.Empty;
 
     public DateTimeOffset OccurredAt { get; private set; }
 
@@ -41,9 +45,7 @@ public sealed class OutboxMessage
             Key = key,
             Content = content,
             OccurredAt = occurredAt,
-            ProcessedAt = null,
             RetryCount = 0,
-            Error = null,
         };
     }
 

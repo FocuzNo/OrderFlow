@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Confluent.Kafka;
 using Confluent.Kafka.Admin;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -6,14 +6,14 @@ using Microsoft.Extensions.Options;
 using OrderFlow.IntegrationEvents.Orders;
 using OrderFlow.Ordering.Domain.Orders;
 using OrderFlow.Ordering.Infrastructure.Messaging.Kafka;
-using OrderFlow.Ordering.Infrastructure.Messaging.Kafka.Producers;
+
 using Testcontainers.Kafka;
 
 namespace OrderFlow.Infrastructure.IntegrationTests.Ordering.Messaging;
 
 public sealed class OrderCreatedKafkaPublisherTests
 {
-    [Fact]
+    [DockerFact]
     public async Task PublishAsync_ShouldPublishOrderCreatedEvent()
     {
         await using var kafkaContainer = new KafkaBuilder("confluentinc/cp-kafka:7.5.12")
@@ -59,19 +59,7 @@ public sealed class OrderCreatedKafkaPublisherTests
             )
             .Build();
 
-        var kafkaOptions = Options.Create(
-            new KafkaOptions
-            {
-                BootstrapServers = bootstrapServers,
-                OrderCreatedTopic = topic,
-            }
-        );
-
-        var publisher = new OrderCreatedKafkaPublisher(
-            producer,
-            kafkaOptions,
-            NullLogger<OrderCreatedKafkaPublisher>.Instance
-        );
+        var publisher = new KafkaPublisher(producer, NullLogger<KafkaPublisher>.Instance);
 
         var productId = Guid.NewGuid();
 
@@ -97,7 +85,10 @@ public sealed class OrderCreatedKafkaPublisherTests
         );
 
         await publisher.PublishAsync(
-            order,
+            topic,
+            order.Id.ToString(),
+            JsonSerializer.Serialize(new OrderCreatedIntegrationEvent(
+                Guid.NewGuid(), order.CreatedAt, order.Id, [new OrderCreatedItem(productId, 2)])),
             CancellationToken.None
         );
 

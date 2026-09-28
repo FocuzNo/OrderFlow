@@ -227,6 +227,11 @@ services:
             ConnectionStrings__InventoryDatabase: Host=inventory-db;Database=inventory;Username=${POSTGRES_USER:-orderflow};Password=${POSTGRES_PASSWORD:-orderflow_dev_only}
 
             Kafka__BootstrapServers: kafka:19092
+            Kafka__ConsumerGroup: orderflow-inventory
+            Kafka__OrderCreatedTopic: orderflow.order.created
+            Kafka__OrderCreatedDeadLetterTopic: orderflow.inventory.order-created.dlt
+            Kafka__InventoryReservedTopic: orderflow.inventory.reserved
+            Kafka__InventoryReservationFailedTopic: orderflow.inventory.reservation-failed
 
         depends_on:
             inventory-db:
